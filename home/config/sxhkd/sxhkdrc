@@ -14,7 +14,7 @@ super + shift + r
 	~/.config/bspwm/scripts/reload.sh
 
 super + shift + p
-	~/.config/bspwm/scripts/power.sh
+  ~/.config/bspwm/scripts/power.sh
 
 # --------------------- APPLICATIONS ---------------------
 
@@ -31,7 +31,7 @@ super + n
 	emacsclient -c -e '(dirvish)'
 
 super + shift + n
-	thunar
+      pcmanfm
 
 super + e
 	emacsclient -c -a "emacs"
@@ -40,7 +40,7 @@ super + b
 	librewolf
 
 super + space
-	rofi -show drun -modi drun -line-padding 4 -hide-scrollbar -show-icons
+	qs ipc call launcher toggle
 
 super + shift + c
 	xcolor -s
@@ -63,9 +63,8 @@ super + c
 super + j
       bolt-launcher --force-device-scale-factor=2.0
 
-super + shift + m
-      mediawriter
-
+super + g
+      steam
 # ------------------- SCRATCHPADS -------------------
 
 super + shift + t
@@ -77,8 +76,6 @@ super + shift + s
 super + shift + b
       ~/nux/home/config/bspwm/scripts/scratchpad.sh bluetui
 
-super + shift + w
-      ~/nux/home/config/bspwm/scripts/scratchpad.sh nmtui 
 
 
 # --------------------- SYSTEM ---------------------
@@ -134,7 +131,13 @@ ctrl + alt + v
 # --------------------- DUNST (NOTIFICATIONS) ---------------------
 
 super + shift + Escape
-	dunstctl history-pop
+	qs ipc call notifications toggle
+
+super + shift + w
+	qs ipc call wallpaper toggle
+
+alt + shift + s
+	qs ipc call settings toggle
 
 
 # ====================================================================
@@ -148,6 +151,12 @@ super + q
 # --- layout ---
 super + o
 	bspc desktop -l next
+
+super + alt + o
+	bsp-layout next --layouts tall,monocle,tiled
+
+super + alt + shift + o
+	bsp-layout previous --layouts tall,monocle,tiled
 
 super + f
 	bspc node -t floating

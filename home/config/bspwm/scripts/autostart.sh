@@ -7,21 +7,17 @@ run() {
 }
 
 # --- Display ---
-run xrandr --output eDP-1 --mode 3840x2400 --rate 60.00
-run nitrogen --restore
+run xrandr --output DP-1 --mode 1920x1080 --rate 239.76
+[ -x "$HOME/.config/bspwm/display-layout.sh" ] && "$HOME/.config/bspwm/display-layout.sh"
+(if [ -x "$HOME/.fehbg" ]; then "$HOME/.fehbg"; else set -- /home/array/nux/wallpapers/*; [ -f "$1" ] && feh --bg-fill "$1"; fi) &
 run picom --config ~/.config/picom/picom.conf --vsync
-run brightnessctl set 60%
 
 # --- Core WM services ---
 run sxhkd
-run snixembed
-run polybar
-run dunst
+run qs -n -c default
 
 # --- System / session ---
 run udiskie
-run lxpolkit
-run skippy-xd --start-daemon
 
 # --- Apps ---
 run emacs --daemon

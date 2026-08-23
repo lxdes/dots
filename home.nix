@@ -13,6 +13,8 @@
   programs.home-manager.enable = true;
   home.enableNixpkgsReleaseCheck = false;
 
+  home.packages = [ pkgs.bsp-layout ];
+
   targets.genericLinux.enable = true;
 
   imports = [

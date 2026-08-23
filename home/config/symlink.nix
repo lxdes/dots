@@ -8,6 +8,7 @@ let
     doom = "doom";
     fastfetch = "fastfetch";
     bspwm = "bspwm";
+    "bsp-layout" = "bsp-layout";
     polybar = "polybar";
     sxhkd = "sxhkd";
     rofi = "rofi";
@@ -16,6 +17,7 @@ let
     touchegg = "touchegg";
     wezterm = "wezterm";
     herdr = "herdr";
+    quickshell = "quickshell";
   };
 
   homeConfigs = {
