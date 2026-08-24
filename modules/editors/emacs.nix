@@ -48,6 +48,5 @@
     pkgs.vips
     pkgs.luaPackages.dkjson
     pkgs.emacsPackages.qml-mode
-    pkgs.vm-curator
   ];
 }

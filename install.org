@@ -5,7 +5,7 @@
 ** Initial
 #+BEGIN_SRC bash
 sudo dnf update --refresh
-sudo dnf install git bspwm sxhkd picom polybar rofi zsh bat eza zoxide fastfetch maim nitrogen feh xrandr lxpolkit dunst xsecurelock udiskie brightnessctl
+ sudo dnf install git bspwm sxhkd picom polybar rofi zsh bat eza zoxide fastfetch maim nitrogen feh xrandr lxpolkit dunst udiskie brightnessctl
 chsh -s zsh
 git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
 git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting

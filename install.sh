@@ -4,6 +4,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 readonly REPO_URL="${NUX_REPO_URL:-https://codeberg.org/lxde/dots.git}"
+readonly VM_CURATOR_VERSION="${VM_CURATOR_VERSION:-1.4.0}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly SCRIPT_DIR
 USER_NAME="${SUDO_USER:-${USER}}"
@@ -107,6 +108,13 @@ install_repositories() {
 
     rpm -q terra-release-extras >/dev/null 2>&1 ||
         sudo dnf install -y terra-release-extras
+
+    if ! rpm -q rpmfusion-free-release rpmfusion-nonfree-release >/dev/null 2>&1; then
+        log "Enabling RPM Fusion for Steam"
+        sudo dnf install -y \
+            "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
+            "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
+    fi
 }
 
 install_system_packages() {
@@ -128,6 +136,11 @@ install_system_packages() {
         fastfetch \
         git \
         ImageMagick \
+        adwaita-icon-theme \
+        file-roller \
+        gvfs \
+        gvfs-mtp \
+        hicolor-icon-theme \
         libnotify \
         lxpolkit \
         maim \
@@ -140,14 +153,20 @@ install_system_packages() {
         polkit \
         polybar \
         quickshell \
+        qemu \
+        qemu-kvm \
         rofi \
         sddm \
         sddm-breeze \
+        shared-mime-info \
+        steam \
+        steam-devices \
         sxhkd \
         thunar \
         thunar-archive-plugin \
         thunar-media-tags-plugin \
         thunar-volman \
+        tumbler \
         udiskie \
         unzip \
         wezterm \
@@ -158,6 +177,8 @@ install_system_packages() {
         xclip \
         xdotool \
         xdg-user-dirs \
+        xdg-user-dirs-gtk \
+        xdg-utils \
         xorg-x11-drv-libinput \
         xorg-x11-server-Xorg \
         xkill \
@@ -167,11 +188,21 @@ install_system_packages() {
         xorg-x11-xinit \
         xrandr \
         xsetroot \
-        xsecurelock \
         zsh
 
     sudo systemctl enable --now NetworkManager.service
     sudo systemctl enable --now bluetooth.service || true
+}
+
+install_vm_curator() {
+    if rpm -q vm-curator >/dev/null 2>&1; then
+        log "vm-curator is already installed"
+        return 0
+    fi
+
+    log "Installing vm-curator RPM"
+    sudo dnf install -y \
+        "https://github.com/mroboff/vm-curator/releases/download/v${VM_CURATOR_VERSION}/vm-curator-${VM_CURATOR_VERSION}-1.x86_64.rpm"
 }
 
 configure_display_manager() {
@@ -278,6 +309,7 @@ main() {
     check_prerequisites
     install_repositories
     install_system_packages
+    install_vm_curator
     convert_to_xlibre
     configure_display_manager
     install_nix

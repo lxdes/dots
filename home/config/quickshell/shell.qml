@@ -78,8 +78,7 @@ ShellRoot {
     readonly property var powerActions: [
         { label: "󰗼  Logout", command: ["bspc", "quit"] },
         { label: "󰐥  Shutdown", command: ["systemctl", "poweroff"] },
-        { label: "󰜉  Reboot", command: ["systemctl", "reboot"] },
-        { label: "󰌾  Lock", command: ["xsecurelock"] }
+        { label: "󰜉  Reboot", command: ["systemctl", "reboot"] }
     ]
     property int powerIndex: 0
     property int screenshotIndex: 0
@@ -235,11 +234,6 @@ ShellRoot {
     function setIconTheme(theme) {
         run(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", theme])
     }
-
-    function lockScreen() {
-        run(["xsecurelock"])
-    }
-
 
     function openSettings(page) {
         settingsPage = page
@@ -3704,13 +3698,7 @@ ShellRoot {
                     ColumnLayout {
                         spacing: 12
                         Text { text: "Session"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
-                        Text { text: "Power, lock, and session controls."; color: muted; font.family: "Inter"; font.pixelSize: 11 }
-                        Button {
-                            text: "󰌾  Lock screen"
-                            onClicked: root.run(["xsecurelock"])
-                            contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignLeft; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.family: "JetBrains Mono"; font.pixelSize: 11 }
-                            background: Rectangle { implicitHeight: 38; color: parent.hovered ? "#252536" : "#171820"; border.width: 1; border.color: "#373b41"; radius: 1 }
-                        }
+                        Text { text: "Power and session controls."; color: muted; font.family: "Inter"; font.pixelSize: 11 }
                         Button {
                             text: "󰗼  Log out"
                             onClicked: root.run(["bspc", "quit"])

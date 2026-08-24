@@ -15,10 +15,6 @@
   programs.home-manager.enable = true;
   home.enableNixpkgsReleaseCheck = false;
 
-  home.packages = [
-    pkgs.vm-curator
-  ];
-
   targets.genericLinux.enable = true;
 
   imports = [

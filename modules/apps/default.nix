@@ -10,7 +10,6 @@
     ./cinny.nix
     ./motrix.nix
     ./ktailctl.nix
-    ./steam.nix
     ./discord.nix
   ];
 }

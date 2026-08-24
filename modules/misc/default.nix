@@ -8,6 +8,5 @@
 {
   imports = [
     ./xcolor.nix
-    ./xsecurelock.nix
   ];
 }

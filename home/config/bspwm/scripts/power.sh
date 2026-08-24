@@ -5,7 +5,6 @@ chosen=$(printf '%s\n' \
 	"   Logout   " \
 	"  Shutdown  " \
 	"   Reboot   " \
-	"    Lock    " \
 	"  [Cancel]  " |
 	rofi -dmenu -i -p "Power Menu" \
 		-line-padding 4 \
@@ -20,6 +19,5 @@ case "$chosen" in
 Logout) bspc quit ;;
 Shutdown) systemctl poweroff ;;
 Reboot) systemctl reboot ;;
-Lock) xsecurelock ;;
 *) exit 0 ;;
 esac
