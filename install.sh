@@ -142,11 +142,13 @@ install_system_packages() {
         xdg-user-dirs \
         xorg-x11-drv-libinput \
         xorg-x11-server-Xorg \
-        xorg-x11-server-utils \
-        xorg-x11-utils \
+        xkill \
+        xprop \
+        xrdb \
         xorg-x11-xauth \
         xorg-x11-xinit \
         xrandr \
+        xsetroot \
         xsecurelock \
         zsh
 
