@@ -82,16 +82,31 @@ install_repositories() {
     log "Enabling Fedora COPRs and Terra"
     sudo dnf install -y dnf-plugins-core
 
-    sudo dnf copr enable -y errornointernet/quickshell
-    sudo dnf copr enable -y @xlibre/xlibre-xserver
-    sudo dnf copr enable -y lxdes/xcolor
-    sudo dnf copr enable -y wezfurlong/wezterm-nightly
+    local copr configured
+    for copr in errornointernet/quickshell @xlibre/xlibre-xserver lxdes/xcolor wezfurlong/wezterm-nightly; do
+        configured="$(sudo dnf copr list 2>/dev/null || true)"
+        if [[ $configured == *"copr.fedorainfracloud.org/$copr"* ]]; then
+            log "COPR already enabled: $copr"
+        else
+            sudo dnf copr enable -y "$copr"
+        fi
+    done
 
-    sudo dnf install -y --nogpgcheck \
-        --repofrompath "terra,https://repos.fyralabs.com/terra\$releasever" \
-        terra-release \
-        terra-gpg-keys
-    sudo dnf install -y terra-release-extras
+    local enabled_repositories
+    enabled_repositories="$(sudo dnf repolist --enabled 2>/dev/null || true)"
+    if [[ $enabled_repositories == *$'\nterra '* || $enabled_repositories == terra\ * ]]; then
+        log "Terra repository already enabled"
+    elif rpm -q terra-release >/dev/null 2>&1; then
+        log "Terra release package already installed"
+    else
+        sudo dnf install -y --nogpgcheck \
+            --repofrompath "terra-bootstrap,https://repos.fyralabs.com/terra\$releasever" \
+            terra-release \
+            terra-gpg-keys
+    fi
+
+    rpm -q terra-release-extras >/dev/null 2>&1 ||
+        sudo dnf install -y terra-release-extras
 }
 
 install_system_packages() {
