@@ -12,18 +12,7 @@
 
 (xterm-mouse-mode 1)
 
-(defconst array-background-color "#0e0e12")
-
-(defun array-apply-background (&optional frame)
-  (set-face-attribute 'default frame :background array-background-color)
-  (set-face-attribute 'fringe frame :background array-background-color))
-
-(add-hook 'after-make-frame-functions #'array-apply-background)
-(array-apply-background)
-
 ;; remove top frame bar in emacs
-(add-to-list 'default-frame-alist '(undecorated . t))
-(add-to-list 'default-frame-alist '(background-color . "#0e0e12"))
 (setq doom-modeline-icon t)
 (setq doom-modeline-major-mode-icon t)
 (setq doom-modeline-lsp-icon t)

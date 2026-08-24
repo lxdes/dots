@@ -12,6 +12,12 @@ git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:
 git clone https://github.com/fdellwing/zsh-bat.git $ZSH_CUSTOM/plugins/zsh-bat
 #+END_SRC
 
+** WezTerm
+#+BEGIN_SRC bash
+sudo dnf copr enable wezfurlong/wezterm-nightly
+sudo dnf install wezterm
+#+END_SRC
+
 ** Nix
 #+BEGIN_SRC bash
 sudo dnf install nix nix-daemon
