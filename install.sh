@@ -125,6 +125,7 @@ install_system_packages() {
         dunst \
         emacs \
         feh \
+        fastfetch \
         git \
         ImageMagick \
         libnotify \
@@ -140,6 +141,8 @@ install_system_packages() {
         polybar \
         quickshell \
         rofi \
+        sddm \
+        sddm-breeze \
         sxhkd \
         thunar \
         thunar-archive-plugin \
@@ -169,6 +172,15 @@ install_system_packages() {
 
     sudo systemctl enable --now NetworkManager.service
     sudo systemctl enable --now bluetooth.service || true
+}
+
+configure_display_manager() {
+    log "Configuring SDDM with the Breeze theme"
+    sudo install -d -m 0755 /etc/sddm.conf.d
+    printf '%s\n' '[Theme]' 'Current=breeze' |
+        sudo tee /etc/sddm.conf.d/10-nux-theme.conf >/dev/null
+    sudo systemctl enable --force sddm.service
+    sudo systemctl set-default graphical.target
 }
 
 convert_to_xlibre() {
@@ -255,7 +267,7 @@ run_post_install() {
 
     local missing=()
     local command_name
-    for command_name in bspwm sxhkd picom rofi maim xrandr qs wezterm; do
+    for command_name in bspwm sxhkd picom rofi maim xrandr qs wezterm fastfetch; do
         run_as_user bash -c "command -v '$command_name' >/dev/null" || missing+=("$command_name")
     done
     ((${#missing[@]} == 0)) || die "installed profile is missing commands: ${missing[*]}"
@@ -267,6 +279,7 @@ main() {
     install_repositories
     install_system_packages
     convert_to_xlibre
+    configure_display_manager
     install_nix
     prepare_repo
     enable_user_services
@@ -279,11 +292,10 @@ main() {
 
 nux is installed for $USER_NAME.
 
-Start the desktop from a TTY with:
-  startx
+Reboot to start the SDDM login manager with the Breeze theme.
 
 If this is a fresh Fedora installation, log out and back in once before
-running startx so the new Nix profile and login shell are loaded.
+rebooting so the new Nix profile and login shell are loaded.
 EOF
 }
 
