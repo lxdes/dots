@@ -155,6 +155,8 @@ install_system_packages() {
         quickshell \
         qemu \
         qemu-kvm \
+        qemu-guest-agent \
+        spice-vdagent \
         rofi \
         sddm \
         sddm-breeze \
@@ -173,6 +175,7 @@ install_system_packages() {
         wireplumber \
         wmname \
         xcolor \
+        xorg-x11-drv-qxl \
         xarchiver \
         xclip \
         xdotool \
@@ -188,10 +191,22 @@ install_system_packages() {
         xorg-x11-xinit \
         xrandr \
         xsetroot \
+        mesa-dri-drivers \
+        mesa-libEGL \
+        mesa-libGL \
+        mesa-vulkan-drivers \
         zsh
 
     sudo systemctl enable --now NetworkManager.service
     sudo systemctl enable --now bluetooth.service || true
+}
+
+enable_vm_guest_services() {
+    systemd-detect-virt --quiet || return 0
+
+    log "Enabling QEMU guest integration"
+    sudo systemctl enable --now qemu-guest-agent.service || true
+    sudo systemctl enable --now spice-vdagentd.service || true
 }
 
 install_vm_curator() {
@@ -309,6 +324,7 @@ main() {
     check_prerequisites
     install_repositories
     install_system_packages
+    enable_vm_guest_services
     install_vm_curator
     convert_to_xlibre
     configure_display_manager
