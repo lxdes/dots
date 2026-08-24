@@ -12,7 +12,7 @@
     thunar-archive-plugin
     thunar-shares-plugin
     thunar-media-tags-plugin
-    xarchiver
+    engrampa
     p7zip
     unzip
     gvfs

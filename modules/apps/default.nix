@@ -9,7 +9,8 @@
     ./bolt.nix
     ./cinny.nix
     ./motrix.nix
-    ./ktailctl.nix
     ./discord.nix
+    ./feishin.nix
+    ./protonplus.nix
   ];
 }

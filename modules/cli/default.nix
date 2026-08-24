@@ -1,7 +1,4 @@
 {
-  config,
-  lib,
-  pkgs,
   ...
 }:
 
@@ -11,5 +8,6 @@
     ./wiremix.nix
     ./opencode.nix
     ./herdr.nix
+    ./vm-curator.nix
   ];
 }

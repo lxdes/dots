@@ -7,6 +7,6 @@
 
 {
   imports = [
-    ./thunar.nix
+    ./pcmanfm.nix
   ];
 }

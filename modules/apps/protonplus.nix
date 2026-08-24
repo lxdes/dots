@@ -1,13 +1,11 @@
 {
-  config,
-  lib,
   pkgs,
   ...
 }:
 
 {
   home.packages = with pkgs; [
-    betterlockscreen
+    protonplus
   ];
 
 }
