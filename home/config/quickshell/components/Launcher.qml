@@ -32,6 +32,11 @@ Window {
             search.selectAll()
     }
 
+    function searchableText(entry) {
+        const keywords = Array.isArray(entry.keywords) ? entry.keywords.join(" ") : (entry.keywords || "")
+        return ((entry.name || "") + " " + (entry.genericName || "") + " " + (entry.comment || "") + " " + keywords + " " + (entry.id || "")).toLowerCase()
+    }
+
     Timer {
         id: focusTimer
         interval: 50
@@ -83,7 +88,6 @@ Window {
                     Text { text: "Applications"; color: root.foreground; font.family: "JetBrains Mono"; font.pixelSize: 15; font.weight: Font.DemiBold }
                     Text { text: "Launch something"; color: root.muted; font.family: "JetBrains Mono"; font.pixelSize: 10 }
                 }
-                Text { text: "ESC"; color: root.muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
             }
 
             TextField {
@@ -97,9 +101,18 @@ Window {
                 font.family: "JetBrains Mono"
                 font.pixelSize: 13
                 leftPadding: 18
-                rightPadding: 18
-                onTextChanged: apps.selectFirst()
+                rightPadding: 62
+                onTextChanged: Qt.callLater(() => apps.selectFirst())
                 background: Rectangle { color: "#171820"; radius: 10; border.width: 1; border.color: search.activeFocus ? root.accent : "#373b41" }
+                Text {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 18
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "ESC"
+                    color: root.muted
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: 9
+                }
                 Keys.onEscapePressed: {
                     root.launcherVisible = false
                     launcher.visible = false
@@ -119,42 +132,39 @@ Window {
                 }
             }
 
+            ScriptModel {
+                id: filteredApps
+                values: {
+                    const query = search.text.trim().toLowerCase()
+                    const entries = DesktopEntries.applications.values.filter(entry => query.length === 0 || launcher.searchableText(entry).indexOf(query) !== -1)
+                    return entries.sort((left, right) => (left.name || "").localeCompare(right.name || ""))
+                }
+            }
+
             ListView {
                 id: apps
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
                 spacing: 6
-                model: DesktopEntries.applications
-                currentIndex: 0
+                model: filteredApps
+                currentIndex: count > 0 ? 0 : -1
 
                 function moveSelection(direction) {
                     if (count === 0) return
-                    let candidate = currentIndex
-                    for (let i = 0; i < count; i++) {
-                        candidate = (candidate + direction + count) % count
-                        const item = itemAtIndex(candidate)
-                        if (item && item.matches) {
-                            currentIndex = candidate
-                            positionViewAtIndex(candidate, ListView.Contain)
-                            return
-                        }
-                    }
+                    currentIndex = ((Math.max(0, currentIndex) + direction) % count + count) % count
+                    positionViewAtIndex(currentIndex, ListView.Contain)
                 }
                 function selectFirst() {
-                    for (let i = 0; i < count; i++) {
-                        const item = itemAtIndex(i)
-                        if (item && item.matches) { currentIndex = i; positionViewAtIndex(i, ListView.Beginning); return }
-                    }
+                    currentIndex = count > 0 ? 0 : -1
+                    if (currentIndex >= 0) positionViewAtBeginning()
                 }
                 function selectLast() {
-                    for (let i = count - 1; i >= 0; i--) {
-                        const item = itemAtIndex(i)
-                        if (item && item.matches) { currentIndex = i; positionViewAtIndex(i, ListView.End); return }
-                    }
+                    currentIndex = count - 1
+                    if (currentIndex >= 0) positionViewAtEnd()
                 }
                 function launchCurrent() {
-                    if (currentItem && currentItem.entry && currentItem.matches) {
+                    if (currentItem && currentItem.entry) {
                         currentItem.entry.execute()
                         root.launcherVisible = false
                         launcher.visible = false
@@ -165,16 +175,8 @@ Window {
                     required property var modelData
                     required property int index
                     property var entry: modelData
-                    readonly property bool valid: entry !== null && entry !== undefined
-                    readonly property string searchText: {
-                        if (!valid) return ""
-                        const keywords = Array.isArray(entry.keywords) ? entry.keywords.join(" ") : (entry.keywords || "")
-                        return ((entry.name || "") + " " + (entry.genericName || "") + " " + (entry.comment || "") + " " + keywords + " " + (entry.id || "")).toLowerCase()
-                    }
-                    readonly property bool matches: valid && (search.text.trim().length === 0 || searchText.indexOf(search.text.trim().toLowerCase()) !== -1)
                     width: apps.width
-                    height: matches ? 48 : 0
-                    visible: matches
+                    height: 48
                     color: ListView.isCurrentItem ? "#252536" : "transparent"
                     border.width: ListView.isCurrentItem ? 1 : 0
                     border.color: root.accent
@@ -204,7 +206,7 @@ Window {
                         hoverEnabled: true
                         onEntered: apps.currentIndex = parent.index
                         onPressed: apps.currentIndex = parent.index
-                        onClicked: { if (!parent.matches) return; apps.currentIndex = parent.index; apps.launchCurrent() }
+                        onClicked: { apps.currentIndex = parent.index; apps.launchCurrent() }
                     }
                 }
                 Keys.onUpPressed: decrementCurrentIndex()

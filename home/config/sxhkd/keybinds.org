@@ -12,11 +12,12 @@
 | *super + shift + n*      | Open file manager (*dolphin*) |
 | *super + e*              | Open Emacs                           |
 | *super + b*              | Open Librewolf                       |
-| *super + space*          | Open application menu (*rofi*)         |
+| *super + space*          | Open Quickshell application menu       |
 | *super + c*              | Open color picker                    |
 | *super + m*              | Open music player (*feishin*) |
 | *super + d*              | Open Discord                         |
-| *super + shift + p*      | Open power management script         |
+| *super + shift + p*      | Open Quickshell power menu            |
+| *super + Home*           | Open Quickshell screenshot menu       |
 | *super + p*              | Open polybar launcher                |
 | *super + shift + x*      | Kill window (*xkill*)                  |
 | *super + ctrl + r*       | Restart BSPWM                        |

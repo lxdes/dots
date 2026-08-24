@@ -63,6 +63,10 @@ ShellRoot {
     property string micName: "Default microphone"
     property var audioSinks: []
     property var audioSources: []
+    property bool audioSinksLoading: false
+    property bool audioSourcesLoading: false
+    property string audioSinksError: ""
+    property string audioSourcesError: ""
     property var bluetoothDevices: []
     property var networkDevices: []
     property var displays: []
@@ -74,18 +78,26 @@ ShellRoot {
     property var workspaceStates: []
     property int batteryCapacity: -1
     property string batteryStatus: ""
+    property real brightnessLevel: 60
+    property bool brightnessAvailable: false
+    property bool touchpadEnabled: true
+    property bool touchpadAvailable: false
+    property int keyboardRepeatDelay: 300
+    property int keyboardRepeatRate: 40
     property var toastNotification: null
     readonly property var powerActions: [
-        { label: "󰗼  Logout", command: ["bspc", "quit"] },
-        { label: "󰐥  Shutdown", command: ["systemctl", "poweroff"] },
-        { label: "󰜉  Reboot", command: ["systemctl", "reboot"] }
+        { icon: "󰗼", label: "Logout", command: ["bspc", "quit"] },
+        { icon: "󰐥", label: "Shutdown", command: ["systemctl", "poweroff"] },
+        { icon: "󰜉", label: "Reboot", command: ["systemctl", "reboot"] },
+        { icon: "󰅖", label: "Cancel", command: null }
     ]
     property int powerIndex: 0
     property int screenshotIndex: 0
     readonly property var screenshotActions: [
-        { label: "󰍹  Fullscreen", mode: "fullscreen" },
-        { label: "󰩭  Region", mode: "region" },
-        { label: "󰖯  Window", mode: "window" }
+        { icon: "󰍹", label: "Fullscreen", mode: "fullscreen" },
+        { icon: "󰩭", label: "Region", mode: "region" },
+        { icon: "󰖯", label: "Window", mode: "window" },
+        { icon: "󰅖", label: "Cancel", mode: "" }
     ]
     property int calendarYear: new Date().getFullYear()
     property int calendarMonth: new Date().getMonth()
@@ -221,6 +233,11 @@ ShellRoot {
         run(["pactl", "set-source-volume", "@DEFAULT_SOURCE@", Math.round(micVolumeLevel) + "%"])
     }
 
+    function toggleOutputMute() {
+        run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"])
+        outputMuted = !outputMuted
+    }
+
     function toggleMicMute() {
         run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "toggle"])
         micMuted = !micMuted
@@ -235,13 +252,46 @@ ShellRoot {
         run(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", theme])
     }
 
-    function openSettings(page) {
+    function selectSettingsPage(page) {
         settingsPage = page
-        refreshAudioDevices()
-        refreshBluetoothDevices()
-        refreshDisplays()
+        if (page === "Audio")
+            refreshAudioDevices()
+        else if (page === "Network")
+            scanNetworks()
+        else if (page === "Displays")
+            refreshDisplays()
+        else if (page === "Session")
+            refreshHardwareSettings()
+    }
+
+    function openSettings(page) {
+        const wasVisible = settingsWindow.visible
+        closePopups()
+        selectSettingsPage(page)
         settingsWindow.visible = true
-        settingsWindow.requestActivate()
+        settingsWindow.x = centerX(settingsWindow.width)
+        settingsWindow.y = centerY(settingsWindow.height)
+        settingsWindow.raise()
+        if (!wasVisible)
+            settingsWindow.requestActivate()
+    }
+
+    function openPowerMenu() {
+        settingsWindow.visible = false
+        closePopups()
+        powerPopup.visible = true
+    }
+
+    function openScreenshotMenu() {
+        settingsWindow.visible = false
+        closePopups()
+        screenshotPopup.visible = true
+    }
+
+    function openWallpaperViewer() {
+        settingsWindow.visible = false
+        wallpaperViewer.visible = true
+        wallpaperViewer.requestActivate()
     }
 
     function applyBspLayout(layout) {
@@ -280,15 +330,42 @@ ShellRoot {
     }
 
     function setBrightness(value) {
-        run(["brightnessctl", "set", Math.round(value) + "%"])
+        if (!brightnessAvailable)
+            return
+        brightnessLevel = Math.round(value)
+        run(["brightnessctl", "-c", "backlight", "set", Math.round(value) + "%"])
     }
 
     function setKeyboardRepeat(delay, rate) {
+        keyboardRepeatDelay = Math.round(delay)
+        keyboardRepeatRate = Math.round(rate)
         run(["xset", "r", "rate", String(delay), String(rate)])
     }
 
     function toggleTouchpad(enabled) {
+        if (!touchpadAvailable)
+            return
+        touchpadEnabled = enabled
         run(["sh", "-c", "command -v xinput >/dev/null && xinput list --id-only '.*[Tt]ouchpad.*' | xargs -r -n1 xinput --set-prop {} 'Device Enabled' " + (enabled ? "1" : "0")])
+    }
+
+    function updateHardwareSettings(output) {
+        const fields = output.split("\n")
+        brightnessAvailable = fields.length > 0 && fields[0].length > 0 && !isNaN(Number(fields[0]))
+        if (brightnessAvailable)
+            brightnessLevel = Number(fields[0])
+        touchpadAvailable = fields.length > 1 && (fields[1] === "0" || fields[1] === "1")
+        if (touchpadAvailable)
+            touchpadEnabled = fields[1] === "1"
+        if (fields.length > 2 && !isNaN(Number(fields[2])))
+            keyboardRepeatDelay = Number(fields[2])
+        if (fields.length > 3 && !isNaN(Number(fields[3])))
+            keyboardRepeatRate = Number(fields[3])
+    }
+
+    function refreshHardwareSettings() {
+        if (!hardwareSettingsQuery.running)
+            hardwareSettingsQuery.running = true
     }
 
     function persistBspwmAppearance() {
@@ -324,7 +401,7 @@ ShellRoot {
     }
 
     function connectNetwork(ssid) {
-        run(["nmcli", "connection", "up", ssid])
+        run(["nmcli", "device", "wifi", "connect", ssid])
     }
 
     function updateDisplays(output) {
@@ -410,16 +487,29 @@ ShellRoot {
     function updateAudioDevices(output, isSource) {
         try {
             const devices = JSON.parse(output)
-            if (isSource)
-                audioSources = devices
-            else
-                audioSinks = devices
+            if (!Array.isArray(devices))
+                throw new Error("Unexpected audio response")
+            const visibleDevices = isSource ? devices.filter(device => !(device.name || "").endsWith(".monitor")) : devices
+            if (isSource) {
+                audioSources = visibleDevices
+                audioSourcesError = visibleDevices.length === 0 ? "No microphone sources found" : ""
+            } else {
+                audioSinks = visibleDevices
+                audioSinksError = visibleDevices.length === 0 ? "No output devices found" : ""
+            }
         } catch (error) {
-            if (isSource)
+            if (isSource) {
                 audioSources = []
-            else
+                audioSourcesError = "Unable to query microphones"
+            } else {
                 audioSinks = []
+                audioSinksError = "Unable to query output devices"
+            }
         }
+        if (isSource)
+            audioSourcesLoading = false
+        else
+            audioSinksLoading = false
     }
 
     function deviceLabel(device) {
@@ -440,9 +530,15 @@ ShellRoot {
     function updateNetworkDevices(output) {
         const devices = []
         for (const line of output.trim().split("\n")) {
-            const fields = line.split("\t")
-            if (fields.length >= 4 && fields[1].length > 0)
-                devices.push({ active: fields[0] === "*", ssid: fields[1], signal: fields[2], security: fields[3] || "Open" })
+            const fields = line.split(":")
+            if (fields.length < 4)
+                continue
+            const active = fields.shift() === "*"
+            const security = fields.pop() || "Open"
+            const signal = fields.pop()
+            const ssid = fields.join(":").replace(/\\:/g, ":")
+            if (ssid.length > 0)
+                devices.push({ active: active, ssid: ssid, signal: signal, security: security })
         }
         networkDevices = devices
     }
@@ -458,6 +554,10 @@ ShellRoot {
     }
 
     function refreshAudioDevices() {
+        audioSinksLoading = true
+        audioSourcesLoading = true
+        audioSinksError = ""
+        audioSourcesError = ""
         if (!audioSinksQuery.running)
             audioSinksQuery.running = true
         if (!audioSourcesQuery.running)
@@ -623,7 +723,7 @@ ShellRoot {
     }
 
     function takeScreenshot(mode) {
-        const capture = mode === "fullscreen" ? "maim -u \"$output\"" : mode === "region" ? "maim -s -u \"$output\"" : "maim -s -b 2 -c 0.3,0.6,1.0,1 -f png \"$output\""
+        const capture = mode === "fullscreen" ? "maim -u \"$output\"" : mode === "region" ? "maim -s -u \"$output\"" : "window=$(bspc query -N -n focused 2>/dev/null); [ -n \"$window\" ] && maim -u -i \"$window\" \"$output\""
         run(["sh", "-c", "sleep 0.3; mkdir -p \"$HOME/Pictures/Screenshots\"; output=\"$HOME/Pictures/Screenshots/screenshot_$(date +%Y-%m-%d_%H-%M-%S).png\"; " + capture + "; if [ -f \"$output\" ]; then command -v xclip >/dev/null 2>&1 && xclip -selection clipboard -target image/png -i \"$output\"; command -v notify-send >/dev/null 2>&1 && notify-send \"Screenshot saved\" \"$output\" --icon=\"$output\" --expire-time=4000; fi"])
         screenshotPopup.visible = false
     }
@@ -748,10 +848,19 @@ ShellRoot {
 
     Process {
         id: displayQuery
-        command: ["sh", "-c", "xrandr --query 2>/dev/null | awk '$2 == \"connected\" { name=$1; primary=($3 == \"primary\" ? \"primary\" : \"secondary\"); next } name && $1 ~ /^[0-9]+x[0-9]+$/ { mode=$1; for (i=2; i<=NF; i++) { rate=$i; selected=(rate ~ /\\*/ ? \"selected\" : \"available\"); gsub(/[^0-9.]/, \"\", rate); if (rate ~ /[0-9]/) print name \"\\tconnected\\t\" primary \"\\t\" mode \"\\t\" rate \"\\t\" selected } name=\"\" }'"]
+        command: ["sh", "-c", "xrandr --query 2>/dev/null | awk '$2 == \"connected\" { name=$1; primary=($3 == \"primary\" ? \"primary\" : \"secondary\"); next } $2 == \"disconnected\" { name=\"\"; next } name && $1 ~ /^[0-9]+x[0-9]+$/ { mode=$1; for (i=2; i<=NF; i++) { rate=$i; selected=(rate ~ /\\*/ ? \"selected\" : \"available\"); gsub(/[^0-9.]/, \"\", rate); if (rate ~ /[0-9]/) print name \"\\tconnected\\t\" primary \"\\t\" mode \"\\t\" rate \"\\t\" selected } }'"]
         stdout: StdioCollector {
             id: displayOutput
             onStreamFinished: root.updateDisplays(displayOutput.text)
+        }
+    }
+
+    Process {
+        id: hardwareSettingsQuery
+        command: ["sh", "-c", "brightness=$(brightnessctl -c backlight -m 2>/dev/null | awk -F, 'NR == 1 {gsub(/%/, \"\", $4); print $4}'); touchpad=; touchpad_id=$(xinput list --id-only '.*[Tt]ouchpad.*' 2>/dev/null | head -n1); [ -n \"$touchpad_id\" ] && touchpad=$(xinput list-props \"$touchpad_id\" 2>/dev/null | awk -F: '/Device Enabled/ {gsub(/[[:space:]]/, \"\", $2); print $2; exit}'); repeat=$(xset q 2>/dev/null | awk '/auto repeat delay/ {print $4; print $7; exit}'); printf '%s\n%s\n%s\n' \"$brightness\" \"$touchpad\" \"$repeat\""]
+        stdout: StdioCollector {
+            id: hardwareSettingsOutput
+            onStreamFinished: root.updateHardwareSettings(hardwareSettingsOutput.text)
         }
     }
 
@@ -934,6 +1043,9 @@ ShellRoot {
                 settingsWindow.visible = false
             else
                 root.openSettings("Audio")
+        }
+        function open(page: string): void {
+            root.openSettings(page)
         }
     }
 
@@ -1845,6 +1957,7 @@ ShellRoot {
             border.width: 1
             border.color: "#373b41"
             radius: 1
+            clip: true
 
             ColumnLayout {
                 anchors.fill: parent
@@ -2097,6 +2210,7 @@ ShellRoot {
             border.width: 1
             border.color: "#373b41"
             radius: 1
+            clip: true
 
             ColumnLayout {
                 anchors.fill: parent
@@ -2474,6 +2588,7 @@ ShellRoot {
             border.width: 1
             border.color: "#373b41"
             radius: 1
+            clip: true
 
             ColumnLayout {
                 anchors.fill: parent
@@ -2534,14 +2649,16 @@ ShellRoot {
                     delegate: Rectangle {
                         required property var modelData
                         width: notificationList.width
-                        height: Math.max(82, notificationBody.implicitHeight + 52)
+                        height: Math.max(90, notificationCardContent.implicitHeight + 24)
                         radius: 8
                         color: "#171820"
+                        clip: true
 
                         ColumnLayout {
+                            id: notificationCardContent
                             anchors.fill: parent
                             anchors.margins: 12
-                             spacing: 2
+                            spacing: 3
 
                             RowLayout {
                                 Layout.fillWidth: true
@@ -2581,7 +2698,9 @@ ShellRoot {
                                 font.family: "JetBrains Mono"
                                 font.pixelSize: 10 * root.menuFontScale
                                 textFormat: Text.PlainText
-                                wrapMode: Text.Wrap
+                                wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                maximumLineCount: 5
+                                elide: Text.ElideRight
                                 Layout.fillWidth: true
                                 Layout.minimumHeight: 18
                             }
@@ -2619,7 +2738,7 @@ ShellRoot {
         anchor.rect.y: bar.height + 12
         color: "transparent"
         implicitWidth: 380
-        implicitHeight: toastNotification && toastNotification.actions.length > 0 ? 180 : 128
+        implicitHeight: toastNotification && toastNotification.actions.length > 0 ? 210 : 156
 
         Rectangle {
             anchors.fill: parent
@@ -2628,11 +2747,12 @@ ShellRoot {
             border.width: 1
             border.color: accent
             radius: 1
+            clip: true
 
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 14
-                 spacing: 2
+                spacing: 4
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -2679,9 +2799,9 @@ ShellRoot {
                     color: muted
                     font.family: "JetBrains Mono"
                     font.pixelSize: 10 * root.menuFontScale
-                    maximumLineCount: 2
+                    maximumLineCount: 3
                     elide: Text.ElideRight
-                    wrapMode: Text.Wrap
+                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                     Layout.fillWidth: true
                     Layout.minimumHeight: 0
                     Layout.preferredHeight: implicitHeight
@@ -2698,6 +2818,7 @@ ShellRoot {
                         delegate: Button {
                             required property var modelData
                             Layout.fillWidth: true
+                            Layout.preferredWidth: 1
                             implicitHeight: 30
                             text: modelData.text
                             onClicked: {
@@ -2713,6 +2834,7 @@ ShellRoot {
                                 font.family: "JetBrains Mono"
                                 font.pixelSize: 9 * root.menuFontScale
                                 elide: Text.ElideRight
+                                clip: true
                             }
                             background: Rectangle {
                                 radius: 1
@@ -2733,10 +2855,10 @@ ShellRoot {
         title: "Power Menu"
         x: root.centerX(width)
         y: root.centerY(height)
-        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.BypassWindowManagerHint
         color: "transparent"
-        width: 290 * menuScale
-        height: 330 * menuScale
+        width: 560 * menuScale
+        height: 180 * menuScale
 
         onVisibleChanged: {
             if (visible) {
@@ -2747,13 +2869,15 @@ ShellRoot {
 
         onActiveChanged: {
             if (active) {
+                powerDismissTimer.stop()
                 powerFocusTimer.restart()
+            } else if (visible) {
+                powerDismissTimer.restart()
             }
         }
 
         function activatePowerMenu() {
             requestActivate()
-            root.floatActiveWindow(290 * root.menuScale, 330 * root.menuScale, 786, 342)
             powerContent.forceActiveFocus(Qt.OtherFocusReason)
         }
 
@@ -2762,6 +2886,16 @@ ShellRoot {
             interval: 50
             repeat: false
             onTriggered: powerPopup.activatePowerMenu()
+        }
+
+        Timer {
+            id: powerDismissTimer
+            interval: 100
+            repeat: false
+            onTriggered: {
+                if (!powerPopup.active)
+                    powerPopup.visible = false
+            }
         }
 
         Rectangle {
@@ -2777,18 +2911,22 @@ ShellRoot {
             Keys.onPressed: event => {
                 switch (event.key) {
                 case Qt.Key_Up:
+                case Qt.Key_Left:
                     powerIndex = (powerIndex + root.powerActions.length - 1) % root.powerActions.length
                     event.accepted = true
                     break
                 case Qt.Key_Down:
+                case Qt.Key_Right:
                 case Qt.Key_Tab:
                     powerIndex = (powerIndex + 1) % root.powerActions.length
                     event.accepted = true
                     break
                 case Qt.Key_Return:
                 case Qt.Key_Enter:
+                    const powerAction = root.powerActions[powerIndex]
                     root.closePopups()
-                    root.run(root.powerActions[powerIndex].command)
+                    if (powerAction.command)
+                        root.run(powerAction.command)
                     event.accepted = true
                     break
                 case Qt.Key_Escape:
@@ -2803,65 +2941,69 @@ ShellRoot {
                 anchors.margins: 18
                 spacing: 10
 
+                RowLayout {
+                    spacing: 8
+                    Text {
+                        text: "󰐥"
+                        color: accent
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: 17 * root.menuFontScale
+                    }
                     Text {
                         text: "Power menu"
-                    color: foreground
-                    font.family: "JetBrains Mono"
-                        font.pixelSize: 15 * root.menuFontScale
-                    font.weight: Font.DemiBold
-                }
-
-                Repeater {
-                    model: root.powerActions
-
-                    delegate: Button {
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: true
-                        implicitHeight: 34
-                        text: modelData.label
-                        focusPolicy: Qt.NoFocus
-                        readonly property bool selected: index === root.powerIndex
-                        onClicked: {
-                            root.powerIndex = index
-                            root.closePopups()
-                            root.run(modelData.command)
-                        }
-                        contentItem: Text {
-                            text: parent.text
-                            color: foreground
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 11
-                        }
-                        background: Rectangle {
-                            radius: 7
-                            color: parent.hovered || parent.selected ? "#252536" : "#171820"
-                            border.width: 1
-                            border.color: "#373b41"
-                        }
-                    }
-                }
-
-                Button {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    text: "󰅖  Cancel"
-                    onClicked: root.closePopups()
-                    contentItem: Text {
-                        text: parent.text
                         color: foreground
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
                         font.family: "JetBrains Mono"
-                        font.pixelSize: 11
+                        font.pixelSize: 15 * root.menuFontScale
+                        font.weight: Font.DemiBold
                     }
-                    background: Rectangle {
-                        radius: 7
-                        color: parent.hovered ? "#252536" : "#171820"
-                        border.width: 1
-                        border.color: "#373b41"
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    Repeater {
+                        model: root.powerActions
+
+                        delegate: Button {
+                            id: powerButton
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 1
+                            implicitHeight: 92
+                            focusPolicy: Qt.NoFocus
+                            readonly property bool selected: index === root.powerIndex
+                            onClicked: {
+                                root.powerIndex = index
+                                root.closePopups()
+                                if (modelData.command)
+                                    root.run(modelData.command)
+                            }
+                            contentItem: ColumnLayout {
+                                spacing: 6
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: modelData.icon
+                                    color: powerButton.selected ? accent : foreground
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: 24
+                                }
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: modelData.label
+                                    color: foreground
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: 10
+                                }
+                            }
+                            background: Rectangle {
+                                radius: 8
+                                color: parent.hovered || parent.selected ? "#252536" : "#171820"
+                                border.width: 1
+                                border.color: parent.selected ? accent : "#373b41"
+                            }
+                        }
                     }
                 }
             }
@@ -2874,10 +3016,10 @@ ShellRoot {
         title: "Screenshot"
         x: root.centerX(width)
         y: root.centerY(height)
-        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         color: "transparent"
-        width: 300 * menuScale
-        height: 260 * menuScale
+        width: 560 * menuScale
+        height: 180 * menuScale
 
         onVisibleChanged: {
             if (visible) {
@@ -2897,7 +3039,6 @@ ShellRoot {
 
         function activateScreenshotMenu() {
             requestActivate()
-            root.floatActiveWindow(300 * root.menuScale, 260 * root.menuScale, 780, 384)
             screenshotContent.forceActiveFocus(Qt.OtherFocusReason)
         }
 
@@ -2943,7 +3084,11 @@ ShellRoot {
                     break
                 case Qt.Key_Return:
                 case Qt.Key_Enter:
-                    root.takeScreenshot(root.screenshotActions[screenshotIndex].mode)
+                    const screenshotAction = root.screenshotActions[screenshotIndex]
+                    if (screenshotAction.mode.length > 0)
+                        root.takeScreenshot(screenshotAction.mode)
+                    else
+                        root.closePopups()
                     event.accepted = true
                     break
                 case Qt.Key_Escape:
@@ -2958,59 +3103,70 @@ ShellRoot {
                 anchors.margins: 18
                 spacing: 10
 
+                RowLayout {
+                    spacing: 8
+                    Text {
+                        text: "󰄀"
+                        color: accent
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: 17 * root.menuFontScale
+                    }
                     Text {
                         text: "Screenshot"
-                    color: foreground
-                    font.family: "JetBrains Mono"
-                        font.pixelSize: 15 * root.menuFontScale
-                    font.weight: Font.DemiBold
-                }
-
-                Repeater {
-                    model: root.screenshotActions
-
-                    delegate: Button {
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: true
-                        implicitHeight: 38
-                        text: modelData.label
-                        onClicked: root.takeScreenshot(modelData.mode)
-                        contentItem: Text {
-                            text: parent.text
-                            color: foreground
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 12
-                        }
-                        background: Rectangle {
-                            radius: 7
-                            color: parent.hovered || index === root.screenshotIndex ? "#252536" : "#171820"
-                            border.width: 1
-                            border.color: "#373b41"
-                        }
-                    }
-                }
-
-                Button {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    text: "󰅖  Cancel"
-                    onClicked: root.closePopups()
-                    contentItem: Text {
-                        text: parent.text
                         color: foreground
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
                         font.family: "JetBrains Mono"
-                        font.pixelSize: 11
+                        font.pixelSize: 15 * root.menuFontScale
+                        font.weight: Font.DemiBold
                     }
-                    background: Rectangle {
-                        radius: 7
-                        color: parent.hovered ? "#252536" : "#171820"
-                        border.width: 1
-                        border.color: "#373b41"
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    Repeater {
+                        model: root.screenshotActions
+
+                        delegate: Button {
+                            id: screenshotButton
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 1
+                            implicitHeight: 92
+                            focusPolicy: Qt.NoFocus
+                            readonly property bool selected: index === root.screenshotIndex
+                            onClicked: {
+                                root.screenshotIndex = index
+                                if (modelData.mode.length > 0)
+                                    root.takeScreenshot(modelData.mode)
+                                else
+                                    root.closePopups()
+                            }
+                            contentItem: ColumnLayout {
+                                spacing: 6
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: modelData.icon
+                                    color: screenshotButton.selected ? accent : foreground
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: 24
+                                }
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: modelData.label
+                                    color: foreground
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: 10
+                                }
+                            }
+                            background: Rectangle {
+                                radius: 8
+                                color: parent.hovered || parent.selected ? "#252536" : "#171820"
+                                border.width: 1
+                                border.color: parent.selected ? accent : "#373b41"
+                            }
+                        }
                     }
                 }
             }
@@ -3172,10 +3328,10 @@ ShellRoot {
         title: "Settings"
         x: root.centerX(width)
         y: root.centerY(height)
-        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         color: "transparent"
-        width: 980
-        height: 680
+        width: root.primaryScreen() ? Math.min(980, root.primaryScreen().width - 48) : 980
+        height: root.primaryScreen() ? Math.min(680, root.primaryScreen().height - 72) : 680
 
         onVisibleChanged: if (visible) requestActivate()
         Keys.onEscapePressed: visible = false
@@ -3241,10 +3397,10 @@ ShellRoot {
                             Layout.fillWidth: true
                             implicitHeight: 42
                             text: modelData.label
-                            onClicked: root.settingsPage = modelData.page
+                            onClicked: root.selectSettingsPage(modelData.page)
                             contentItem: Text {
                                 text: parent.text
-                                color: root.settingsPage === modelData.page ? foreground : muted
+                                color: root.settingsPage === modelData.page ? background : muted
                                 horizontalAlignment: Text.AlignLeft
                                 verticalAlignment: Text.AlignVCenter
                                 leftPadding: 14
@@ -3255,6 +3411,43 @@ ShellRoot {
                             background: Rectangle {
                                 radius: 10
                                 color: root.settingsPage === modelData.page ? accent : (parent.hovered ? settingsRaised : "transparent")
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "Quick actions"
+                        color: muted
+                        font.family: "Inter"
+                        font.pixelSize: 10
+                        Layout.topMargin: 8
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        Repeater {
+                            model: [
+                                { icon: "󰸉", action: "wallpaper" },
+                                { icon: "󰄀", action: "screenshot" },
+                                { icon: "󰌾", action: "lock" }
+                            ]
+                            delegate: Button {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                implicitHeight: 36
+                                text: modelData.icon
+                                onClicked: {
+                                    if (modelData.action === "wallpaper")
+                                        root.openWallpaperViewer()
+                                    else if (modelData.action === "screenshot")
+                                        root.openScreenshotMenu()
+                                    else
+                                        root.lockScreen()
+                                }
+                                contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 15 }
+                                background: Rectangle { color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 8 }
                             }
                         }
                     }
@@ -3279,84 +3472,139 @@ ShellRoot {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.leftMargin: 4
-                        currentIndex: root.settingsPage === "Audio" ? 0 : root.settingsPage === "Network" ? 1 : root.settingsPage === "Bluetooth" ? 2 : root.settingsPage === "Displays" ? 3 : root.settingsPage === "Appearance" ? 4 : 5
+                        currentIndex: root.settingsPage === "Network" ? 1 : root.settingsPage === "Bluetooth" ? 2 : root.settingsPage === "Displays" ? 3 : root.settingsPage === "Appearance" ? 4 : root.settingsPage === "Session" ? 5 : 0
 
                     ColumnLayout {
                         spacing: 12
 
-                        Text {
-                            text: "Audio devices"
-                            color: foreground
-                            font.family: "Inter"
-                            font.pixelSize: 20 * root.menuFontScale
-                            font.weight: Font.DemiBold
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text { text: "Sound"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
+                            Item { Layout.fillWidth: true }
+                            Button {
+                                text: root.audioSinksLoading || root.audioSourcesLoading ? "Refreshing..." : "󰑐  Refresh"
+                                enabled: !root.audioSinksLoading && !root.audioSourcesLoading
+                                onClicked: root.refreshAudioDevices()
+                                contentItem: Text { text: parent.text; color: parent.enabled ? foreground : muted; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                background: Rectangle { implicitWidth: 92; implicitHeight: 30; color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 8 }
+                            }
                         }
 
-                        Text {
-                            text: "Select the default output and microphone."
-                            color: muted
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 11
+                        Text { text: "Volume, mute state, and default PipeWire devices."; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 10 }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                Layout.preferredHeight: 116
+                                color: settingsSurface
+                                border.width: 1
+                                border.color: settingsOutline
+                                radius: 10
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 6
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { text: root.outputMuted ? "󰝟  Output muted" : "󰕾  Output"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
+                                        Item { Layout.fillWidth: true }
+                                        Button {
+                                            text: root.outputMuted ? "Unmute" : "Mute"
+                                            onClicked: root.toggleOutputMute()
+                                            contentItem: Text { text: parent.text; color: accent; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                            background: Rectangle { implicitWidth: 58; implicitHeight: 26; color: parent.hovered ? settingsRaised : background; border.width: 1; border.color: settingsOutline; radius: 7 }
+                                        }
+                                    }
+                                    Text { text: Math.round(root.volumeLevel) + "%  •  " + root.audioDetail; color: muted; Layout.fillWidth: true; elide: Text.ElideMiddle; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                    Slider { Layout.fillWidth: true; from: 0; to: 1; value: root.volumeLevel / 100; onMoved: root.setVolume(value) }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                Layout.preferredHeight: 116
+                                color: settingsSurface
+                                border.width: 1
+                                border.color: settingsOutline
+                                radius: 10
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 6
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { text: root.micMuted ? "󰍭  Microphone muted" : "󰍬  Microphone"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
+                                        Item { Layout.fillWidth: true }
+                                        Button {
+                                            text: root.micMuted ? "Unmute" : "Mute"
+                                            onClicked: root.toggleMicMute()
+                                            contentItem: Text { text: parent.text; color: accent; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                            background: Rectangle { implicitWidth: 58; implicitHeight: 26; color: parent.hovered ? settingsRaised : background; border.width: 1; border.color: settingsOutline; radius: 7 }
+                                        }
+                                    }
+                                    Text { text: Math.round(root.micVolumeLevel) + "%  •  " + root.micName; color: muted; Layout.fillWidth: true; elide: Text.ElideMiddle; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                    Slider { Layout.fillWidth: true; from: 0; to: 1; value: root.micVolumeLevel / 100; onMoved: root.setMicVolume(value) }
+                                }
+                            }
                         }
 
-                        Text { text: "Output sinks"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text { text: "Default devices"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
+                            Item { Layout.fillWidth: true }
+                            Button {
+                                text: "󰓃  Open Wiremix"
+                                onClicked: root.run(["wezterm", "-e", "wiremix"])
+                                contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                background: Rectangle { implicitWidth: 112; implicitHeight: 30; color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 8 }
+                            }
+                        }
 
+                        Text { text: "Output"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
                         ListView {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 180
+                            Layout.preferredHeight: 104
                             clip: true
-                            spacing: 5
+                            spacing: 4
                             model: root.audioSinks
                             delegate: Rectangle {
                                 required property var modelData
                                 width: parent ? parent.width : 0
-                                height: 44
-                                 radius: 10
-                                 color: modelData.name === root.defaultSinkName ? settingsRaised : settingsSurface
+                                height: 38
+                                radius: 9
+                                color: modelData.name === root.defaultSinkName ? settingsRaised : settingsSurface
                                 border.width: modelData.name === root.defaultSinkName ? 1 : 0
                                 border.color: accent
-                                Text {
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    text: (modelData.name === root.defaultSinkName ? "●  " : "○  ") + root.deviceLabel(modelData)
-                                    color: foreground
-                                    verticalAlignment: Text.AlignVCenter
-                                    font.family: "JetBrains Mono"
-                                    font.pixelSize: 10 * root.menuFontScale
-                                    elide: Text.ElideRight
-                                }
+                                Text { anchors.fill: parent; anchors.margins: 10; text: (modelData.name === root.defaultSinkName ? "●  " : "○  ") + root.deviceLabel(modelData); color: foreground; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9; elide: Text.ElideRight }
                                 MouseArea { anchors.fill: parent; onClicked: root.setDefaultSink(modelData.name) }
                             }
+                            Text { anchors.centerIn: parent; visible: root.audioSinks.length === 0; text: root.audioSinksLoading ? "Loading output devices..." : root.audioSinksError; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
                         }
 
-                        Text { text: "Microphone sources"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
-
+                        Text { text: "Microphone"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
                         ListView {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
-                            spacing: 5
+                            spacing: 4
                             model: root.audioSources
                             delegate: Rectangle {
                                 required property var modelData
                                 width: parent ? parent.width : 0
-                                height: 44
-                                 radius: 10
-                                 color: modelData.name === root.defaultSourceName ? settingsRaised : settingsSurface
+                                height: 38
+                                radius: 9
+                                color: modelData.name === root.defaultSourceName ? settingsRaised : settingsSurface
                                 border.width: modelData.name === root.defaultSourceName ? 1 : 0
                                 border.color: accent
-                                Text {
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    text: (modelData.name === root.defaultSourceName ? "●  " : "○  ") + root.deviceLabel(modelData)
-                                    color: foreground
-                                    verticalAlignment: Text.AlignVCenter
-                                    font.family: "JetBrains Mono"
-                                    font.pixelSize: 10 * root.menuFontScale
-                                    elide: Text.ElideRight
-                                }
+                                Text { anchors.fill: parent; anchors.margins: 10; text: (modelData.name === root.defaultSourceName ? "●  " : "○  ") + root.deviceLabel(modelData); color: foreground; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9; elide: Text.ElideRight }
                                 MouseArea { anchors.fill: parent; onClicked: root.setDefaultSource(modelData.name) }
                             }
+                            Text { anchors.centerIn: parent; visible: root.audioSources.length === 0; text: root.audioSourcesLoading ? "Loading microphones..." : root.audioSourcesError; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
                         }
                     }
 
@@ -3699,23 +3947,36 @@ ShellRoot {
                         spacing: 12
                         Text { text: "Session"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
                         Text { text: "Power and session controls."; color: muted; font.family: "Inter"; font.pixelSize: 11 }
-                        Button {
-                            text: "󰗼  Log out"
-                            onClicked: root.run(["bspc", "quit"])
-                            contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignLeft; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.family: "JetBrains Mono"; font.pixelSize: 11 }
-                            background: Rectangle { implicitHeight: 38; color: parent.hovered ? "#252536" : "#171820"; border.width: 1; border.color: "#373b41"; radius: 1 }
-                        }
-                        Button {
-                            text: "󰜉  Reboot"
-                            onClicked: root.run(["systemctl", "reboot"])
-                            contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignLeft; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.family: "JetBrains Mono"; font.pixelSize: 11 }
-                            background: Rectangle { implicitHeight: 38; color: parent.hovered ? "#252536" : "#171820"; border.width: 1; border.color: "#373b41"; radius: 1 }
-                        }
-                        Button {
-                            text: "󰐥  Shut down"
-                            onClicked: root.run(["systemctl", "poweroff"])
-                            contentItem: Text { text: parent.text; color: "#f38ba8"; horizontalAlignment: Text.AlignLeft; verticalAlignment: Text.AlignVCenter; leftPadding: 12; font.family: "JetBrains Mono"; font.pixelSize: 11 }
-                            background: Rectangle { implicitHeight: 38; color: parent.hovered ? "#252536" : "#171820"; border.width: 1; border.color: "#373b41"; radius: 1 }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Repeater {
+                                model: [
+                                    { icon: "󰌾", label: "Lock", action: "lock" },
+                                    { icon: "󰑓", label: "Reload desktop", action: "reload" },
+                                    { icon: "󰐥", label: "Power options", action: "power" }
+                                ]
+                                delegate: Button {
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 1
+                                    implicitHeight: 68
+                                    onClicked: {
+                                        if (modelData.action === "lock")
+                                            root.lockScreen()
+                                        else if (modelData.action === "reload")
+                                            root.run(["sh", "-c", "$HOME/.config/bspwm/scripts/reload.sh"])
+                                        else
+                                            root.openPowerMenu()
+                                    }
+                                    contentItem: ColumnLayout {
+                                        spacing: 3
+                                        Text { Layout.alignment: Qt.AlignHCenter; text: modelData.icon; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 18 }
+                                        Text { Layout.alignment: Qt.AlignHCenter; text: modelData.label; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                    }
+                                    background: Rectangle { color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 9 }
+                                }
+                            }
                         }
                         Rectangle {
                             Layout.fillWidth: true
@@ -3733,22 +3994,45 @@ ShellRoot {
                                     Layout.fillWidth: true
                                     Text { text: "Brightness"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
                                     Item { Layout.fillWidth: true }
-                                    Text { text: "Use slider"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                    Text { text: root.brightnessAvailable ? Math.round(root.brightnessLevel) + "%" : "Unavailable"; color: root.brightnessAvailable ? accent : muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
                                 }
-                                Slider { Layout.fillWidth: true; from: 5; to: 100; value: 60; onMoved: root.setBrightness(value) }
+                                Slider { Layout.fillWidth: true; enabled: root.brightnessAvailable; opacity: enabled ? 1 : 0.35; from: 5; to: 100; value: root.brightnessLevel; onMoved: root.setBrightness(value) }
                                 RowLayout {
                                     Layout.fillWidth: true
                                     Text { text: "Touchpad"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
                                     Item { Layout.fillWidth: true }
-                                    Switch { checked: true; onToggled: root.toggleTouchpad(checked) }
+                                    Text { visible: !root.touchpadAvailable; text: "Unavailable"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                    Switch { visible: root.touchpadAvailable; checked: root.touchpadEnabled; onClicked: root.toggleTouchpad(checked) }
                                 }
                             }
                         }
-                        Button {
-                            text: "Keyboard repeat defaults"
-                            onClicked: root.setKeyboardRepeat(300, 40)
-                            contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                            background: Rectangle { implicitHeight: 32; color: parent.hovered ? "#252536" : "#171820"; border.width: 1; border.color: "#373b41"; radius: 1 }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 142
+                            color: settingsSurface
+                            border.width: 1
+                            border.color: settingsOutline
+                            radius: 8
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                spacing: 5
+                                Text { text: "Keyboard repeat"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Text { text: "Delay"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                    Item { Layout.fillWidth: true }
+                                    Text { text: root.keyboardRepeatDelay + " ms"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                }
+                                Slider { Layout.fillWidth: true; from: 150; to: 1000; stepSize: 10; value: root.keyboardRepeatDelay; onMoved: root.setKeyboardRepeat(value, root.keyboardRepeatRate) }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Text { text: "Rate"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                    Item { Layout.fillWidth: true }
+                                    Text { text: root.keyboardRepeatRate + " / sec"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                                }
+                                Slider { Layout.fillWidth: true; from: 10; to: 60; stepSize: 1; value: root.keyboardRepeatRate; onMoved: root.setKeyboardRepeat(root.keyboardRepeatDelay, value) }
+                            }
                         }
                         Item { Layout.fillHeight: true }
                     }

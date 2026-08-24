@@ -14,7 +14,7 @@ super + shift + r
 	~/.config/bspwm/scripts/reload.sh
 
 super + shift + p
-  ~/.config/bspwm/scripts/power.sh
+	qs ipc call power toggle
 
 # --------------------- APPLICATIONS ---------------------
 
@@ -121,7 +121,7 @@ XF86MonBrightnessDown
 # --------------------- SCREENSHOT / MISC TOOLS ---------------------
 
 super + Home
-	~/.config/bspwm/scripts/screenshot.sh
+	qs ipc call screenshot toggle
 
 ctrl + alt + v
 	bspc rule -a \* -o state=floating ; pavucontrol
