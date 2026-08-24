@@ -10,7 +10,7 @@ chosen=$(printf '%s\n' \
 	rofi -dmenu -i -p "Power Menu" \
 		-line-padding 4 \
 		-hide-scrollbar \
-		-theme-str 'window { width: 11%; anchor: center; location: center; }' \
+		-theme-str 'window { width: 14%; anchor: center; location: center; }' \
 		-no-fixed-num-lines)
 
 # Trim leading/trailing spaces for matching

@@ -5,6 +5,8 @@
 }:
 
 {
+  nixpkgs.config.allowUnfree = true;
+
   home.username = "array";
   home.homeDirectory = "/home/array";
 
@@ -13,7 +15,9 @@
   programs.home-manager.enable = true;
   home.enableNixpkgsReleaseCheck = false;
 
-  home.packages = [ pkgs.bsp-layout ];
+  home.packages = [
+    pkgs.vm-curator
+  ];
 
   targets.genericLinux.enable = true;
 

@@ -19,7 +19,19 @@
 [[file:home/config/sxhkd/keybinds.org][keybinds.org]]
 
 ** Installation
- [[file:install.org][install.org]]
+ Run the Fedora installer from a TTY or an existing minimal X session:
+ #+BEGIN_SRC bash
+ git clone https://codeberg.org/lxde/dots.git ~/nux
+ cd ~/nux
+ ./install.sh
+ #+END_SRC
+
+ The installer installs full Xorg and replaces its server/input packages
+ with XLibre, enables the Quickshell, XLibre, xcolor, and WezTerm nightly
+ COPRs plus Terra, then installs Quickshell, Emacs, and WezTerm through RPM
+ packages. Home Manager installs the remaining Nix packages, including
+ =vm-curator=. Use =./install.sh --skip-doom= to omit Doom.
+ The older manual notes are kept in [[file:install.org][install.org]].
 
 ** Special Thanks 
 - [[https://gitlab.com/dwilliam62][Ddubsos]]

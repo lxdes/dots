@@ -4,7 +4,6 @@
 
 {
   imports = [
-    #./st.nix
-    #./wezterm.nix
+    ./wezterm.nix
   ];
 }

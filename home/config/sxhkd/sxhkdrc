@@ -31,7 +31,7 @@ super + n
 	emacsclient -c -e '(dirvish)'
 
 super + shift + n
-      pcmanfm
+      thunar
 
 super + e
 	emacsclient -c -a "emacs"
@@ -43,7 +43,7 @@ super + space
 	qs ipc call launcher toggle
 
 super + shift + c
-	xcolor -s
+      xcolor -f hex -s clipboard
 
 super + m
 	feishin
@@ -54,7 +54,7 @@ super + d
 super + l
 	localsend_app
 
-super + s
+super + g
 	signal-desktop
 
 super + c
@@ -63,8 +63,9 @@ super + c
 super + j
       bolt-launcher --force-device-scale-factor=2.0
 
-super + g
+super + s
       steam
+
 # ------------------- SCRATCHPADS -------------------
 
 super + shift + t
@@ -76,12 +77,10 @@ super + shift + s
 super + shift + b
       ~/nux/home/config/bspwm/scripts/scratchpad.sh bluetui
 
-
-
 # --------------------- SYSTEM ---------------------
 
 super + shift + l
-      betterlockscreen -l	
+      qs ipc call lock toggle
 
 super + alt + s
 	systemctl poweroff

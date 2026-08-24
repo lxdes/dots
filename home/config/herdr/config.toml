@@ -11,7 +11,7 @@ sidebar_start_collapsed = true
 name = "tokyo-night"
 
 [theme.custom]
-panel_bg = "#111117"
+panel_bg = "#0e0e12"
 
 [keys]
 prefix = "alt+a"

@@ -1,7 +1,7 @@
 ;;; modules/ui.el -*- lexical-binding: t; -*-
 
 (setq doom-font
-      (font-spec :family "Iosevka Nerd Font" :size 38)
+      (font-spec :family "Iosevka Nerd Font" :size 18)
       doom-variable-pitch-font
       (font-spec :family "Iosevka Nerd Font")
       doom-theme 'doom-tokyo-night
@@ -12,12 +12,18 @@
 
 (xterm-mouse-mode 1)
 
-(after! doom-themes
-  (unless (display-graphic-p)
-    (set-face-background 'default "undefined")))
+(defconst array-background-color "#0e0e12")
+
+(defun array-apply-background (&optional frame)
+  (set-face-attribute 'default frame :background array-background-color)
+  (set-face-attribute 'fringe frame :background array-background-color))
+
+(add-hook 'after-make-frame-functions #'array-apply-background)
+(array-apply-background)
 
 ;; remove top frame bar in emacs
 (add-to-list 'default-frame-alist '(undecorated . t))
+(add-to-list 'default-frame-alist '(background-color . "#0e0e12"))
 (setq doom-modeline-icon t)
 (setq doom-modeline-major-mode-icon t)
 (setq doom-modeline-lsp-icon t)

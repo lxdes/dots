@@ -7,28 +7,25 @@
 #
 
 # --- Environment ---
-export GDK_SCALE=2
-export GDK_DPI_SCALE=0.8
-export QT_SCALE_FACTOR=1.3
-export GTK_USE_PORTAL=1
-export XCURSOR_SIZE=48
+export XCURSOR_SIZE=24
 export XCURSOR_THEME=Bibata-Modern-Ice
 export ELECTRON_OZONE_PLATFORM_HINT=x11
+export XDG_CURRENT_DESKTOP=bspwm
 
 # --- Startup ---
 ~/.config/bspwm/scripts/autostart.sh &
 xsetroot -cursor_name left_ptr &
 xrdb -merge ~/.Xresources &
-touchegg &
 wmname BSPWM &
 
 # --- Workspaces ---
 bspc monitor -d 1 2 3 4 5 6 7 8 9 0
 
 # --- Appearance ---
-bspc config border_width 4
-bspc config window_gap 12
-bspc config top_padding 0
+bspc config border_width 2
+bspc config window_gap 6
+[ -x "$HOME/.config/bspwm/appearance.sh" ] && "$HOME/.config/bspwm/appearance.sh"
+bspc config top_padding 32
 bspc config bottom_padding 0
 bspc config borderless_monocle true
 bspc config gapless_monocle true
