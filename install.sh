@@ -241,8 +241,8 @@ install_doom() {
 
 set_default_shell() {
     log "Setting zsh as the login shell"
-    local zsh_path
-    zsh_path="$(command -v zsh)"
+    local zsh_path=/usr/bin/zsh
+    [[ -x "$zsh_path" ]] || die "Fedora's zsh package did not install $zsh_path"
     if [[ "$(getent passwd "$USER_NAME" | cut -d: -f7)" != "$zsh_path" ]]; then
         sudo chsh -s "$zsh_path" "$USER_NAME"
     fi
