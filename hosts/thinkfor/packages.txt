@@ -1,0 +1,12 @@
+dunst
+udiskie
+brightnessctl
+amd-ucode-firmware
+amd-gpu-firmware
+mesa-dri-drivers
+mesa-vulkan-drivers
+mesa-libGL
+mesa-libEGL
+vulkan-loader
+libva
+libva-utils

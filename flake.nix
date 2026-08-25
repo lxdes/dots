@@ -38,6 +38,18 @@
         ];
       };
 
+      homeConfigurations.thinkfor = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        extraSpecialArgs = {
+          inherit inputs;
+          hostProfile = "thinkfor";
+          homeManagerImpure = false;
+        };
+        modules = [
+          ./hosts/thinkfor
+        ];
+      };
+
       homeConfigurations.vm = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
         extraSpecialArgs = {
