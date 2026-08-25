@@ -34,7 +34,10 @@ sudo dnf install -y --allowerasing \
   xlibre-xf86-video-qxl
 sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
-sudo systemctl enable --now qemu-guest-agent.service
+sudo systemctl enable qemu-guest-agent.service
+if [[ -e /dev/virtio-ports/org.qemu.guest_agent.0 ]]; then
+  sudo systemctl start qemu-guest-agent.service
+fi
 
 mkdir -p "$HOME/.config/nix"
 touch "$HOME/.config/nix/nix.conf"
