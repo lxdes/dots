@@ -1,0 +1,16 @@
+git
+nix
+nix-daemon
+bspwm
+sxhkd
+picom
+quickshell-git
+zsh
+bat
+eza
+zoxide
+fastfetch
+maim
+nitrogen
+feh
+xrandr

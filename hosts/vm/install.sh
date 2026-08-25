@@ -12,10 +12,12 @@ copr_repos=(
   wezfurlong/wezterm-nightly
 )
 
-while IFS= read -r package; do
-  [[ -z "$package" || "$package" == \#* ]] && continue
-  packages+=("$package")
-done < "$host_dir/packages.txt"
+for manifest in "$repo_root/hosts/base.txt" "$host_dir/packages.txt"; do
+  while IFS= read -r package; do
+    [[ -z "$package" || "$package" == \#* ]] && continue
+    packages+=("$package")
+  done < "$manifest"
+done
 
 sudo dnf install -y dnf-plugins-core
 for repo in "${copr_repos[@]}"; do
