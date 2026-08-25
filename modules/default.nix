@@ -10,7 +10,6 @@
     ./terminals/default.nix
     ./apps/default.nix
     ./cli/default.nix
-    ./fm/default.nix
   ];
 
 }

@@ -20,7 +20,6 @@
     ../../modules/cli/vm-curator.nix
     ../../modules/cli/wiremix.nix
     ../../modules/editors/emacs.nix
-    ../../modules/fm/pcmanfm.nix
     ../../modules/shells/zsh.nix
     ../../modules/system/audio.nix
     ../../modules/system/cursor.nix
