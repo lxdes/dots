@@ -30,6 +30,8 @@
         inherit pkgs;
         extraSpecialArgs = {
           inherit inputs;
+          hostProfile = "forda";
+          homeManagerImpure = false;
         };
         modules = [
           ./hosts/forda
@@ -40,9 +42,23 @@
         inherit pkgs;
         extraSpecialArgs = {
           inherit inputs;
+          hostProfile = "vm";
+          homeManagerImpure = false;
         };
         modules = [
           ./hosts/vm
+        ];
+      };
+
+      homeConfigurations.generic = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        extraSpecialArgs = {
+          inherit inputs;
+          hostProfile = "generic";
+          homeManagerImpure = true;
+        };
+        modules = [
+          ./hosts/generic
         ];
       };
     };

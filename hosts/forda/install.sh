@@ -42,3 +42,8 @@ if ! grep -qxF 'experimental-features = nix-command flakes' "$HOME/.config/nix/n
 fi
 
 nix run github:nix-community/home-manager -- switch --flake "$repo_root#forda"
+
+if [[ ! -d "$HOME/.config/emacs/.git" ]]; then
+  git clone --depth 1 https://github.com/doomemacs/core "$HOME/.config/emacs"
+fi
+"$HOME/.config/emacs/bin/doom" install

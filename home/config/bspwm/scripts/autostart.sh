@@ -11,6 +11,7 @@ setup_display() {
 	command -v xrandr >/dev/null 2>&1 || return 0
 
 	layout="$HOME/nux/hosts/$(hostname -s)/displays.sh"
+	[ -x "$layout" ] || layout="$HOME/nux/hosts/generic/displays.sh"
 	if [ -x "$layout" ]; then
 		for attempt in 1 2 3 4 5 6 7 8 9 10; do
 			"$layout" && return 0

@@ -1,8 +1,8 @@
 { ... }:
 
 {
-  home.username = "array";
-  home.homeDirectory = "/home/array";
+  home.username = builtins.getEnv "USER";
+  home.homeDirectory = builtins.getEnv "HOME";
 
   imports = [
     ../../home.nix
@@ -20,6 +20,6 @@
   nux.cursor.size = 24;
   nux.xftDpi = 96;
 
-  # Add Nix packages needed only in the VM here.
+  # Add Nix packages needed only on generic hosts here.
   home.packages = [ ];
 }

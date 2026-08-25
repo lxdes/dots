@@ -7,9 +7,6 @@
 {
   nixpkgs.config.allowUnfree = true;
 
-  home.username = "array";
-  home.homeDirectory = "/home/array";
-
   home.stateVersion = "26.11";
 
   programs.home-manager.enable = true;

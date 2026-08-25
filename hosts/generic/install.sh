@@ -30,14 +30,9 @@ fi
 
 sudo dnf install -y --allowerasing \
   xlibre-xserver \
-  xlibre-xf86-input-libinput \
-  xlibre-xf86-video-qxl
+  xlibre-xf86-input-libinput
 sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
-sudo systemctl enable qemu-guest-agent.service
-if [[ -e /dev/virtio-ports/org.qemu.guest_agent.0 ]]; then
-  sudo systemctl start qemu-guest-agent.service
-fi
 
 mkdir -p "$HOME/.config/nix"
 touch "$HOME/.config/nix/nix.conf"
@@ -45,7 +40,7 @@ if ! grep -qxF 'experimental-features = nix-command flakes' "$HOME/.config/nix/n
   printf '%s\n' 'experimental-features = nix-command flakes' >> "$HOME/.config/nix/nix.conf"
 fi
 
-nix run github:nix-community/home-manager -- switch --flake "$repo_root#vm"
+nix run github:nix-community/home-manager -- switch --impure --flake "$repo_root#generic"
 
 if [[ ! -d "$HOME/.config/emacs/.git" ]]; then
   git clone --depth 1 https://github.com/doomemacs/core "$HOME/.config/emacs"

@@ -1,6 +1,9 @@
 { ... }:
 
 {
+  home.username = "array";
+  home.homeDirectory = "/home/array";
+
   imports = [
     ../../home.nix
     ../../modules/apps/bolt.nix
