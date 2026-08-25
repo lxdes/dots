@@ -11,6 +11,5 @@ eza
 zoxide
 fastfetch
 maim
-nitrogen
 feh
 xrandr

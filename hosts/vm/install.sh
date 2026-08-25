@@ -28,6 +28,7 @@ if ((${#packages[@]})); then
   sudo dnf install "${packages[@]}"
 fi
 
+sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
 sudo systemctl enable --now qemu-guest-agent.service
 
