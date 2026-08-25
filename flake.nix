@@ -26,13 +26,23 @@
       };
     in
     {
-      homeConfigurations.array = home-manager.lib.homeManagerConfiguration {
+      homeConfigurations.forda = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
         extraSpecialArgs = {
           inherit inputs;
         };
         modules = [
-          ./home.nix
+          ./hosts/forda
+        ];
+      };
+
+      homeConfigurations.vm = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        extraSpecialArgs = {
+          inherit inputs;
+        };
+        modules = [
+          ./hosts/vm
         ];
       };
     };

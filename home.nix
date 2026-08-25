@@ -19,7 +19,6 @@
 
   imports = [
     ./home/default.nix
-    ./modules/default.nix
   ];
 
 }
