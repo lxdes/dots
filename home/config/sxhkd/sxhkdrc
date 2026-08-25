@@ -16,6 +16,9 @@ super + shift + r
 super + shift + p
 	qs ipc call power toggle
 
+super + shift + o
+	qs ipc call note center
+
 # --------------------- APPLICATIONS ---------------------
 
 super + Return

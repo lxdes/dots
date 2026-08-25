@@ -1,4 +1,0 @@
-# bsp-layout settings
-TALL_RATIO=0.60;
-WIDE_RATIO=0.60;
-USE_NAMES=1;

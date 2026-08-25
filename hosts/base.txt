@@ -19,3 +19,10 @@ xrdb
 wmname
 xdotool
 emacs
+librewolf
+i3lock
+ImageMagick
+NetworkManager-tui
+tailscale
+wezterm
+xclip

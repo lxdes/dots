@@ -5,9 +5,7 @@
 
 {
   home.packages = with pkgs; [
-    imagemagick
-    maim
-    xclip
+    onlyoffice-desktopeditors
   ];
 
 }

@@ -23,6 +23,8 @@ sudo dnf install -y dnf-plugins-core
 for repo in "${copr_repos[@]}"; do
   sudo dnf copr enable -y "$repo"
 done
+sudo dnf config-manager addrepo --overwrite \
+  --from-repofile=https://repo.librewolf.net/librewolf.repo
 
 if ((${#packages[@]})); then
   sudo dnf install "${packages[@]}"
@@ -34,6 +36,8 @@ sudo dnf install -y --allowerasing \
   xlibre-xf86-video-qxl
 sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
+sudo systemctl enable --now tailscaled.service
+sudo tailscale set --operator="$USER" || true
 sudo systemctl enable qemu-guest-agent.service
 if [[ -e /dev/virtio-ports/org.qemu.guest_agent.0 ]]; then
   sudo systemctl start qemu-guest-agent.service

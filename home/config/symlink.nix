@@ -8,11 +8,7 @@ let
     doom = "doom";
     fastfetch = "fastfetch";
     bspwm = "bspwm";
-    "bsp-layout" = "bsp-layout";
-    polybar = "polybar";
     sxhkd = "sxhkd";
-    rofi = "rofi";
-    dunst = "dunst";
     picom = "picom";
     touchegg = "touchegg";
     wezterm = "wezterm";

@@ -15,25 +15,33 @@ Window {
     color: "transparent"
     property string colorHex: root.background
     property bool captureReady: false
+    readonly property string capturePath: "/tmp/quickshell-color-picker-" + Quickshell.processId + ".png"
 
     onVisibleChanged: {
         if (visible) {
             requestActivate()
             captureReady = false
+            screenCapture.command = ["maim", "-u", "-g", width + "x" + height + (x >= 0 ? "+" : "") + x + (y >= 0 ? "+" : "") + y, capturePath]
             screenCapture.running = true
+        } else {
+            root.run(["rm", "-f", capturePath])
         }
     }
-    Keys.onEscapePressed: visible = false
+
+    Shortcut {
+        sequence: "Escape"
+        onActivated: picker.visible = false
+    }
 
     Process {
         id: screenCapture
-        command: ["maim", "-u", "/tmp/quickshell-color-picker.png"]
+        command: ["maim", "-u", picker.capturePath]
         onExited: captureReady = true
     }
 
     Process {
         id: colorSample
-        command: ["convert", "/tmp/quickshell-color-picker.png", "-crop", "1x1+0+0", "-format", "#%[hex:p{0,0}]", "info:"]
+        command: ["convert", picker.capturePath, "-crop", "1x1+0+0", "-format", "#%[hex:p{0,0}]", "info:"]
         stdout: StdioCollector {
             id: colorSampleOutput
             onStreamFinished: {
@@ -47,7 +55,7 @@ Window {
     function sampleColor(x, y) {
         if (!captureReady || colorSample.running)
             return
-        colorSample.command = ["convert", "/tmp/quickshell-color-picker.png", "-crop", "1x1+" + Math.round(x) + "+" + Math.round(y), "-format", "#%[hex:p{0,0}]", "info:"]
+        colorSample.command = ["convert", capturePath, "-crop", "1x1+" + Math.round(x) + "+" + Math.round(y), "-format", "#%[hex:p{0,0}]", "info:"]
         colorSample.running = true
     }
 

@@ -17,6 +17,7 @@
 | *super + m*              | Open music player (*feishin*) |
 | *super + d*              | Open Discord                         |
 | *super + shift + p*      | Open Quickshell power menu            |
+| *super + shift + o*      | Open centered Org note capture        |
 | *super + Home*           | Open Quickshell screenshot menu       |
 | *super + p*              | Open polybar launcher                |
 | *super + shift + x*      | Kill window (*xkill*)                  |

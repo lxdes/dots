@@ -13,6 +13,7 @@
     ../../modules/apps/motrix.nix
     ../../modules/apps/protonplus.nix
     ../../modules/apps/signal.nix
+    ../../modules/apps/onlyoffice.nix
     ../../modules/cli/bluetui.nix
     ../../modules/cli/herdr.nix
     ../../modules/cli/opencode.nix

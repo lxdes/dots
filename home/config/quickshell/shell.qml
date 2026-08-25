@@ -25,8 +25,12 @@ ShellRoot {
     property real menuFontScale: 1.2
     property int panelHeight: 32
     property bool compositorEnabled: true
+    property string currentIconTheme: "Papirus-Dark"
+    property string currentGtkTheme: "Adwaita"
+    property var gtkThemes: ["Adwaita", "Adwaita-dark"]
 
     property string activeDesktop: "1"
+    property bool quickNoteCentered: false
     property string activeTitle: "Desktop"
     property string audioStatus: ""
     property string networkStatus: ""
@@ -42,6 +46,8 @@ ShellRoot {
     property int windowGap: 6
     property int borderWidth: 2
     property real volumeLevel: 50
+    property real pendingVolumeLevel: 50
+    property bool volumeAdjusting: false
     property bool launcherVisible: false
     property string tailscaleState: "Stopped"
     property var tailscaleNodes: []
@@ -57,7 +63,14 @@ ShellRoot {
     property double networkUploadMbps: 0
     property double previousRxBytes: -1
     property double previousTxBytes: -1
+    property double previousNetworkSampleMs: 0
+    property bool wifiAvailable: false
+    property bool wifiEnabled: false
+    property string wifiDevice: ""
+    property var vpnProfiles: []
     property real micVolumeLevel: 0
+    property real pendingMicVolumeLevel: 0
+    property bool micVolumeAdjusting: false
     property bool micMuted: false
     property bool outputMuted: false
     property string micName: "Default microphone"
@@ -151,6 +164,31 @@ ShellRoot {
         }))
     }
 
+    function setActiveWorkspace(name) {
+        activeDesktop = name
+        workspaceStates = workspaceStates.map(workspace => ({
+            name: workspace.name,
+            occupied: workspace.occupied,
+            urgent: workspace.urgent,
+            active: workspace.name === name
+        }))
+    }
+
+    function focusWorkspace(name) {
+        setActiveWorkspace(name)
+        run(["bspc", "desktop", "-f", name])
+    }
+
+    function cycleWorkspace(step) {
+        if (workspaceStates.length === 0)
+            return
+        let current = workspaceStates.findIndex(workspace => workspace.name === activeDesktop)
+        if (current < 0)
+            current = 0
+        const next = (current + step + workspaceStates.length) % workspaceStates.length
+        focusWorkspace(workspaceStates[next].name)
+    }
+
     function updateBattery(output) {
         const fields = output.trim().split("\n")
         batteryCapacity = fields.length > 0 && !isNaN(Number(fields[0])) ? Number(fields[0]) : -1
@@ -168,7 +206,7 @@ ShellRoot {
         outputMuted = fields.length > 7 && fields[7].trim() === "yes"
         networkStatus = fields.length > 1 ? fields[1].trim() : ""
         bluetoothStatus = fields.length > 2 ? fields[2].trim() : ""
-        if (fields.length > 3 && !isNaN(Number(fields[3].trim())))
+        if (!volumeAdjusting && fields.length > 3 && !isNaN(Number(fields[3].trim())))
             volumeLevel = Number(fields[3].trim())
         audioDetail = fields.length > 4 ? fields[4].trim() : "Default sink"
         defaultSinkName = fields.length > 4 ? fields[4].trim() : ""
@@ -178,15 +216,26 @@ ShellRoot {
 
     function updateNetworkMetrics(output) {
         const fields = output.trim().split("\n")
+        const nextInterface = fields.length > 0 ? fields[0] : ""
+        if (nextInterface !== networkInterface) {
+            previousRxBytes = -1
+            previousTxBytes = -1
+            previousNetworkSampleMs = 0
+            networkDownloadMbps = 0
+            networkUploadMbps = 0
+        }
         const rxBytes = fields.length > 5 ? Number(fields[5]) : 0
         const txBytes = fields.length > 6 ? Number(fields[6]) : 0
-        if (previousRxBytes >= 0 && rxBytes >= previousRxBytes)
-            networkDownloadMbps = (rxBytes - previousRxBytes) * 8 / 1000000
-        if (previousTxBytes >= 0 && txBytes >= previousTxBytes)
-            networkUploadMbps = (txBytes - previousTxBytes) * 8 / 1000000
+        const sampleMs = Date.now()
+        const elapsedMs = previousNetworkSampleMs > 0 ? sampleMs - previousNetworkSampleMs : 0
+        if (elapsedMs > 0 && previousRxBytes >= 0 && rxBytes >= previousRxBytes)
+            networkDownloadMbps = (rxBytes - previousRxBytes) * 8 / (elapsedMs * 1000)
+        if (elapsedMs > 0 && previousTxBytes >= 0 && txBytes >= previousTxBytes)
+            networkUploadMbps = (txBytes - previousTxBytes) * 8 / (elapsedMs * 1000)
         previousRxBytes = rxBytes
         previousTxBytes = txBytes
-        networkInterface = fields.length > 0 ? fields[0] : ""
+        previousNetworkSampleMs = sampleMs
+        networkInterface = nextInterface
         networkType = fields.length > 1 ? fields[1] : ""
         networkIp = fields.length > 3 ? fields[3] : ""
         if (networkInterface.length === 0) {
@@ -219,18 +268,49 @@ ShellRoot {
         Quickshell.execDetached(command)
     }
 
-    function floatActiveWindow(width, height, x, y) {
-        run(["sh", "-c", "sleep 0.1; id=$(xdotool getactivewindow 2>/dev/null); [ -n \"$id\" ] && bspc node -t floating && xdotool windowsize \"$id\" " + width + " " + height + " && xdotool windowmove \"$id\" " + x + " " + y])
+    function lockScreen() {
+        settingsWindow.visible = false
+        closePopups()
+        run(["sh", "-c", "if command -v betterlockscreen >/dev/null 2>&1; then exec betterlockscreen -l; elif command -v i3lock >/dev/null 2>&1; then exec i3lock -c 0e0e12; else notify-send 'Screen locker unavailable' 'Install i3lock or betterlockscreen'; fi"])
+    }
+
+    function toggleQuickNote(centered) {
+        const shouldOpen = !quickNotePopup.visible
+        closePopups()
+        if (shouldOpen)
+            quickNoteCentered = centered === true
+        quickNotePopup.visible = shouldOpen
+        if (shouldOpen)
+            quickNoteFocusTimer.restart()
+    }
+
+    function saveQuickNote() {
+        const title = quickNoteTitle.text.trim() || "Quick note"
+        const body = quickNoteBody.text.trim()
+        if (title === "Quick note" && body.length === 0)
+            return
+        const timestamp = Qt.formatDateTime(new Date(), "yyyy-MM-dd ddd HH:mm")
+        const content = "* " + title + "\n  :PROPERTIES:\n  :CREATED: [" + timestamp + "]\n  :END:" + (body.length > 0 ? "\n  " + body.replace(/\n/g, "\n  ") : "")
+        run(["sh", "-c", "mkdir -p \"$HOME/org\"; printf '\\n%s\\n' " + shellQuote(content) + " >> \"$HOME/org/inbox.org\"; notify-send 'Org note saved' \"$HOME/org/inbox.org\""])
+        quickNoteTitle.clear()
+        quickNoteBody.clear()
+        quickNotePopup.visible = false
     }
 
     function setVolume(value) {
-        volumeLevel = value * 100
-        run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", Math.round(volumeLevel) + "%"])
+        pendingVolumeLevel = Math.round(value * 100)
+        volumeLevel = pendingVolumeLevel
+        volumeAdjusting = true
+        volumeApplyTimer.restart()
+        volumeSettleTimer.restart()
     }
 
     function setMicVolume(value) {
-        micVolumeLevel = value * 100
-        run(["pactl", "set-source-volume", "@DEFAULT_SOURCE@", Math.round(micVolumeLevel) + "%"])
+        pendingMicVolumeLevel = Math.round(value * 100)
+        micVolumeLevel = pendingMicVolumeLevel
+        micVolumeAdjusting = true
+        micVolumeApplyTimer.restart()
+        micVolumeSettleTimer.restart()
     }
 
     function toggleOutputMute() {
@@ -249,7 +329,15 @@ ShellRoot {
     }
 
     function setIconTheme(theme) {
+        currentIconTheme = theme
         run(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", theme])
+    }
+
+    function setGtkTheme(theme) {
+        currentGtkTheme = theme
+        const dark = theme.toLowerCase().indexOf("dark") !== -1
+        run(["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", theme])
+        run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", dark ? "prefer-dark" : "default"])
     }
 
     function selectSettingsPage(page) {
@@ -258,8 +346,12 @@ ShellRoot {
             refreshAudioDevices()
         else if (page === "Network")
             scanNetworks()
+        else if (page === "Bluetooth")
+            refreshBluetoothDevices()
         else if (page === "Displays")
             refreshDisplays()
+        else if (page === "Appearance")
+            refreshAppearanceSettings()
         else if (page === "Session")
             refreshHardwareSettings()
     }
@@ -368,9 +460,30 @@ ShellRoot {
             hardwareSettingsQuery.running = true
     }
 
+    function updateAppearanceSettings(output) {
+        const fields = output.trim().split("\n")
+        if (fields.length > 0 && fields[0].length > 0)
+            currentIconTheme = fields[0]
+        if (fields.length > 1 && fields[1].length > 0)
+            currentGtkTheme = fields[1]
+    }
+
+    function updateGtkThemes(output) {
+        const themes = output.trim().split("\n").filter(theme => theme.length > 0)
+        if (themes.indexOf(currentGtkTheme) === -1)
+            themes.unshift(currentGtkTheme)
+        gtkThemes = themes
+    }
+
+    function refreshAppearanceSettings() {
+        if (!appearanceSettingsQuery.running)
+            appearanceSettingsQuery.running = true
+        if (!gtkThemesQuery.running)
+            gtkThemesQuery.running = true
+    }
+
     function persistBspwmAppearance() {
-        const script = "#!/usr/bin/env sh\nbspc config window_gap " + windowGap + "\nbspc config border_width " + borderWidth + "\n"
-        run(["sh", "-c", "mkdir -p \"$HOME/.config/bspwm\"; printf '%s' '" + script + "' > \"$HOME/.config/bspwm/appearance.sh\"; chmod +x \"$HOME/.config/bspwm/appearance.sh\""])
+        appearancePersistTimer.restart()
     }
 
     function layoutIcon(layout) {
@@ -402,6 +515,52 @@ ShellRoot {
 
     function connectNetwork(ssid) {
         run(["nmcli", "device", "wifi", "connect", ssid])
+    }
+
+    function updateWifiState(output) {
+        const fields = output.trim().split("\n")
+        wifiEnabled = fields.length > 0 && fields[0] === "enabled"
+        wifiDevice = fields.length > 1 ? fields[1] : ""
+        wifiAvailable = wifiDevice.length > 0
+    }
+
+    function setWifiEnabled(enabled) {
+        wifiEnabled = enabled
+        run(["nmcli", "radio", "wifi", enabled ? "on" : "off"])
+        wifiRefreshTimer.restart()
+    }
+
+    function updateVpnProfiles(output) {
+        const profiles = []
+        for (const line of output.trim().split("\n")) {
+            const fields = line.split("\t")
+            if (fields.length < 3 || fields[0].length === 0)
+                continue
+            profiles.push({ name: fields[0], type: fields[1], active: fields[2] !== "--" && fields[2].length > 0, device: fields[2] })
+        }
+        vpnProfiles = profiles
+    }
+
+    function toggleVpnProfile(name, active) {
+        run(["nmcli", "connection", active ? "down" : "up", name])
+        vpnRefreshTimer.restart()
+    }
+
+    function setTailscaleEnabled(enabled) {
+        run(["tailscale", enabled ? "up" : "down"])
+        vpnRefreshTimer.restart()
+    }
+
+    function refreshVpnSettings() {
+        if (!vpnProfilesQuery.running)
+            vpnProfilesQuery.running = true
+        if (!tailscaleQuery.running)
+            tailscaleQuery.running = true
+        if (!exitConfigQuery.running)
+            exitConfigQuery.running = true
+        if (!publicIpQuery.running)
+            publicIpQuery.running = true
+        refreshExitSuggestion()
     }
 
     function updateDisplays(output) {
@@ -472,12 +631,12 @@ ShellRoot {
                 commands.push("xrandr --output " + shellQuote(display.name) + " --primary")
         }
         const script = commands.join("\n") + "\n"
-        run(["sh", "-c", "mkdir -p \"$HOME/.config/bspwm\"; printf '%s' " + shellQuote(script) + " > \"$HOME/.config/bspwm/display-layout.sh\"; chmod +x \"$HOME/.config/bspwm/display-layout.sh\""])
+        run(["sh", "-c", "target=\"$HOME/nux/hosts/${NUX_HOST:-generic}/displays.sh\"; mkdir -p \"$(dirname \"$target\")\"; printf '%s' " + shellQuote(script) + " > \"$target\"; chmod +x \"$target\""])
     }
 
     function updateMicStatus(output) {
         const fields = output.trim().split("\n")
-        if (fields.length > 0 && !isNaN(Number(fields[0])))
+        if (!micVolumeAdjusting && fields.length > 0 && !isNaN(Number(fields[0])))
             micVolumeLevel = Number(fields[0])
         micMuted = fields.length > 1 && fields[1] === "yes"
         micName = fields.length > 2 && fields[2].length > 0 ? fields[2] : "Default microphone"
@@ -572,8 +731,11 @@ ShellRoot {
 
     function scanNetworks() {
         networkScanning = true
+        if (!wifiStateQuery.running)
+            wifiStateQuery.running = true
         if (!networkDevicesQuery.running)
             networkDevicesQuery.running = true
+        refreshVpnSettings()
     }
 
     function closePopups() {
@@ -597,6 +759,8 @@ ShellRoot {
             calendarPopup.visible = false
         if (typeof layoutPopup !== "undefined")
             layoutPopup.visible = false
+        if (typeof quickNotePopup !== "undefined")
+            quickNotePopup.visible = false
     }
 
     function togglePopup(popup) {
@@ -665,9 +829,12 @@ ShellRoot {
     }
 
     function selectExitNode(address) {
+        const returnToPopup = exitNodePopup.visible
         run(["tailscale", "set", "--exit-node", address])
         exitNodePopup.visible = false
-        networkPopup.visible = true
+        if (returnToPopup)
+            networkPopup.visible = true
+        vpnRefreshTimer.restart()
     }
 
     function refreshExitSuggestion() {
@@ -699,9 +866,12 @@ ShellRoot {
     }
 
     function clearExitNode() {
+        const returnToPopup = exitNodePopup.visible
         run(["tailscale", "set", "--exit-node", ""])
         exitNodePopup.visible = false
-        networkPopup.visible = true
+        if (returnToPopup)
+            networkPopup.visible = true
+        vpnRefreshTimer.restart()
     }
 
     function calendarMonthName() {
@@ -728,6 +898,44 @@ ShellRoot {
         screenshotPopup.visible = false
     }
 
+    Timer {
+        id: appearancePersistTimer
+        interval: 180
+        repeat: false
+        onTriggered: {
+            const script = "#!/usr/bin/env sh\nbspc config window_gap " + root.windowGap + "\nbspc config border_width " + root.borderWidth + "\n"
+            root.run(["sh", "-c", "mkdir -p \"$HOME/.config/bspwm\"; printf '%s' " + root.shellQuote(script) + " > \"$HOME/.config/bspwm/appearance.sh\"; chmod +x \"$HOME/.config/bspwm/appearance.sh\""])
+        }
+    }
+
+    Timer {
+        id: volumeApplyTimer
+        interval: 60
+        repeat: false
+        onTriggered: root.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", Math.round(root.pendingVolumeLevel) + "%"])
+    }
+
+    Timer {
+        id: volumeSettleTimer
+        interval: 400
+        repeat: false
+        onTriggered: root.volumeAdjusting = false
+    }
+
+    Timer {
+        id: micVolumeApplyTimer
+        interval: 60
+        repeat: false
+        onTriggered: root.run(["pactl", "set-source-volume", "@DEFAULT_SOURCE@", Math.round(root.pendingMicVolumeLevel) + "%"])
+    }
+
+    Timer {
+        id: micVolumeSettleTimer
+        interval: 400
+        repeat: false
+        onTriggered: root.micVolumeAdjusting = false
+    }
+
     Process {
         id: bspwmQuery
         command: ["bspc", "query", "-D", "-d", "--names"]
@@ -736,7 +944,19 @@ ShellRoot {
             id: bspwmOutput
             onStreamFinished: root.updateBspwm(bspwmOutput.text)
         }
-        onExited: running = true
+    }
+
+    Process {
+        id: bspwmDesktopEvents
+        command: ["sh", "-c", "bspc subscribe desktop_focus | while IFS= read -r event; do bspc query -D -d --names; done"]
+        running: true
+        stdout: SplitParser {
+            onRead: data => {
+                const name = data.trim()
+                if (name.length > 0)
+                    root.setActiveWorkspace(name)
+            }
+        }
     }
 
     Process {
@@ -747,7 +967,6 @@ ShellRoot {
             id: workspaceOutput
             onStreamFinished: root.updateWorkspaces(workspaceOutput.text)
         }
-        onExited: running = true
     }
 
     Process {
@@ -758,7 +977,6 @@ ShellRoot {
             id: batteryOutput
             onStreamFinished: root.updateBattery(batteryOutput.text)
         }
-        onExited: running = true
     }
 
     Process {
@@ -768,10 +986,6 @@ ShellRoot {
         stdout: StdioCollector {
             id: windowTitleOutput
             onStreamFinished: root.updateActiveTitle(windowTitleOutput.text)
-        }
-        onExited: {
-            root.updateActiveTitle(windowTitleOutput.text)
-            running = true
         }
     }
 
@@ -783,7 +997,6 @@ ShellRoot {
             id: statusCollector
             onStreamFinished: root.updateStatus(statusCollector.text)
         }
-        onExited: running = true
     }
 
     Process {
@@ -794,7 +1007,6 @@ ShellRoot {
             id: micStatusOutput
             onStreamFinished: root.updateMicStatus(micStatusOutput.text)
         }
-        onExited: running = true
     }
 
     Process {
@@ -805,7 +1017,6 @@ ShellRoot {
             id: wallpaperOutput
             onStreamFinished: root.wallpapers = wallpaperOutput.text.trim().length > 0 ? wallpaperOutput.text.trim().split("\n") : []
         }
-        onExited: running = true
     }
 
     Process {
@@ -847,6 +1058,24 @@ ShellRoot {
     }
 
     Process {
+        id: wifiStateQuery
+        command: ["sh", "-c", "radio=$(nmcli radio wifi 2>/dev/null); device=$(nmcli -t -f DEVICE,TYPE device status 2>/dev/null | awk -F: '$2 == \"wifi\" {print $1; exit}'); printf '%s\\n%s\\n' \"$radio\" \"$device\""]
+        stdout: StdioCollector {
+            id: wifiStateOutput
+            onStreamFinished: root.updateWifiState(wifiStateOutput.text)
+        }
+    }
+
+    Process {
+        id: vpnProfilesQuery
+        command: ["sh", "-c", "nmcli -t --escape no -f NAME,TYPE,DEVICE connection show 2>/dev/null | awk -F: '$2 == \"vpn\" || $2 == \"wireguard\" {printf \"%s\\t%s\\t%s\\n\", $1, $2, ($3 == \"\" ? \"--\" : $3)}'"]
+        stdout: StdioCollector {
+            id: vpnProfilesOutput
+            onStreamFinished: root.updateVpnProfiles(vpnProfilesOutput.text)
+        }
+    }
+
+    Process {
         id: displayQuery
         command: ["sh", "-c", "xrandr --query 2>/dev/null | awk '$2 == \"connected\" { name=$1; primary=($3 == \"primary\" ? \"primary\" : \"secondary\"); next } $2 == \"disconnected\" { name=\"\"; next } name && $1 ~ /^[0-9]+x[0-9]+$/ { mode=$1; for (i=2; i<=NF; i++) { rate=$i; selected=(rate ~ /\\*/ ? \"selected\" : \"available\"); gsub(/[^0-9.]/, \"\", rate); if (rate ~ /[0-9]/) print name \"\\tconnected\\t\" primary \"\\t\" mode \"\\t\" rate \"\\t\" selected } }'"]
         stdout: StdioCollector {
@@ -865,6 +1094,24 @@ ShellRoot {
     }
 
     Process {
+        id: appearanceSettingsQuery
+        command: ["sh", "-c", "icons=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d \"'\"); gtk=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | tr -d \"'\"); printf '%s\\n%s\\n' \"$icons\" \"$gtk\""]
+        stdout: StdioCollector {
+            id: appearanceSettingsOutput
+            onStreamFinished: root.updateAppearanceSettings(appearanceSettingsOutput.text)
+        }
+    }
+
+    Process {
+        id: gtkThemesQuery
+        command: ["sh", "-c", "for dir in /usr/share/themes \"$HOME/.local/share/themes\" \"$HOME/.themes\" \"$HOME/.nix-profile/share/themes\"; do [ -d \"$dir\" ] && find \"$dir\" -mindepth 1 -maxdepth 1 -type d -printf '%f\\n'; done | sort -u"]
+        stdout: StdioCollector {
+            id: gtkThemesOutput
+            onStreamFinished: root.updateGtkThemes(gtkThemesOutput.text)
+        }
+    }
+
+    Process {
         id: networkMetricsQuery
         command: ["sh", "-c", "iface=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i==\"dev\") {print $(i+1); exit}}'); [ -z \"$iface\" ] && iface=$(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | awk -F: '$3==\"connected\" && $1!=\"lo\" {print $1; exit}'); type=$(nmcli -g GENERAL.TYPE device show \"$iface\" 2>/dev/null | head -n1); connection=$(nmcli -g GENERAL.CONNECTION device show \"$iface\" 2>/dev/null | head -n1); ip=$(nmcli -g IP4.ADDRESS device show \"$iface\" 2>/dev/null | cut -d/ -f1 | head -n1); rx=0; tx=0; [ -n \"$iface\" ] && rx=$(cat /sys/class/net/\"$iface\"/statistics/rx_bytes 2>/dev/null || printf 0); [ -n \"$iface\" ] && tx=$(cat /sys/class/net/\"$iface\"/statistics/tx_bytes 2>/dev/null || printf 0); printf '%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n' \"$iface\" \"$type\" \"$connection\" \"$ip\" \"$connection\" \"$rx\" \"$tx\""]
         running: true
@@ -872,7 +1119,6 @@ ShellRoot {
             id: networkMetricsOutput
             onStreamFinished: root.updateNetworkMetrics(networkMetricsOutput.text)
         }
-        onExited: running = true
     }
 
     Process {
@@ -892,7 +1138,6 @@ ShellRoot {
             id: exitConfigOutput
             onStreamFinished: root.updateExitConfig(exitConfigOutput.text)
         }
-        onExited: running = true
     }
 
     Process {
@@ -960,6 +1205,20 @@ ShellRoot {
             if (!batteryQuery.running)
                 batteryQuery.running = true
         }
+    }
+
+    Timer {
+        id: wifiRefreshTimer
+        interval: 700
+        repeat: false
+        onTriggered: root.scanNetworks()
+    }
+
+    Timer {
+        id: vpnRefreshTimer
+        interval: 900
+        repeat: false
+        onTriggered: root.refreshVpnSettings()
     }
 
     IpcHandler {
@@ -1072,6 +1331,16 @@ ShellRoot {
         }
     }
 
+    IpcHandler {
+        target: "note"
+        function toggle(): void {
+            root.toggleQuickNote(false)
+        }
+        function center(): void {
+            root.toggleQuickNote(true)
+        }
+    }
+
     PanelWindow {
         id: bar
         screen: root.primaryScreen()
@@ -1089,32 +1358,44 @@ ShellRoot {
 
             RowLayout {
                 Layout.alignment: Qt.AlignVCenter
-                spacing: 10
+                spacing: 0
 
                 Repeater {
                     model: root.workspaceStates
 
-                    delegate: Rectangle {
+                    delegate: Item {
                         required property var modelData
-                        implicitWidth: 9.4
-                        implicitHeight: 9.4
-                        radius: 1
-                        color: modelData.active ? foreground : (modelData.urgent ? "#f38ba8" : "transparent")
-                        border.width: modelData.occupied && !modelData.active ? 1 : 0
-                        border.color: accent
+                        implicitWidth: 19.4
+                        implicitHeight: root.panelHeight
 
-                        Text {
+                        Rectangle {
                             anchors.centerIn: parent
-                            text: parent.modelData.name
-                            color: foreground
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 13
-                            font.weight: Font.DemiBold
+                            width: 9.4
+                            height: 9.4
+                            radius: 1
+                            color: modelData.active ? foreground : (modelData.urgent ? "#f38ba8" : "transparent")
+                            border.width: modelData.occupied && !modelData.active ? 1 : 0
+                            border.color: accent
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.name
+                                color: foreground
+                                font.family: "JetBrains Mono"
+                                font.pixelSize: 13
+                                font.weight: Font.DemiBold
+                            }
                         }
 
                         MouseArea {
+                            id: workspaceMouse
                             anchors.fill: parent
-                            onClicked: run(["bspc", "desktop", "-f", modelData.name])
+                            hoverEnabled: true
+                            onClicked: root.focusWorkspace(modelData.name)
+                            onWheel: wheel => {
+                                root.cycleWorkspace(wheel.angleDelta.y > 0 ? -1 : 1)
+                                wheel.accepted = true
+                            }
                         }
                     }
 
@@ -1278,6 +1559,135 @@ ShellRoot {
     }
 
     LayoutPopup { id: layoutPopup; root: root; bar: bar }
+
+    Window {
+        id: quickNotePopup
+        visible: false
+        title: "Quick Org note"
+        x: root.quickNoteCentered ? root.centerX(width) : (root.primaryScreen() ? root.primaryScreen().x + root.primaryScreen().width - width - 10 : Screen.width - width - 10)
+        y: root.quickNoteCentered ? root.centerY(height) : (root.primaryScreen() ? root.primaryScreen().y + root.panelHeight + 2 : root.panelHeight + 2)
+        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Dialog
+        color: "transparent"
+        width: 430 * menuScale
+        height: 330 * menuScale
+
+        onVisibleChanged: if (visible) quickNoteFocusTimer.restart()
+
+        Timer {
+            id: quickNoteFocusTimer
+            interval: 50
+            repeat: false
+            onTriggered: {
+                quickNotePopup.requestActivate()
+                quickNoteTitle.forceActiveFocus(Qt.OtherFocusReason)
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: background
+            border.width: 1
+            border.color: settingsOutline
+            radius: 2
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 10
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Rectangle {
+                        Layout.preferredWidth: 34
+                        Layout.preferredHeight: 34
+                        radius: 10
+                        color: accent
+                        Text { anchors.centerIn: parent; text: "󰎜"; color: background; font.family: "JetBrains Mono"; font.pixelSize: 17 }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 1
+                        Text { text: "Quick Org note"; color: foreground; font.family: "Noto Sans"; font.pixelSize: 14 * root.menuFontScale; font.weight: Font.DemiBold }
+                        Text { text: "~/org/inbox.org"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
+                    }
+                    Button {
+                        implicitWidth: 32
+                        implicitHeight: 32
+                        text: "×"
+                        onClicked: quickNotePopup.visible = false
+                        contentItem: Text { text: parent.text; color: muted; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 20 }
+                        background: Rectangle { radius: 8; color: parent.hovered ? settingsRaised : "transparent" }
+                    }
+                }
+
+                TextField {
+                    id: quickNoteTitle
+                    Layout.fillWidth: true
+                    implicitHeight: 40
+                    placeholderText: "Title (optional)"
+                    color: foreground
+                    placeholderTextColor: muted
+                    selectionColor: highlight
+                    font.family: "Noto Sans"
+                    font.pixelSize: 11 * root.menuFontScale
+                    leftPadding: 12
+                    rightPadding: 12
+                    background: Rectangle { color: settingsSurface; border.width: 1; border.color: quickNoteTitle.activeFocus ? accent : settingsOutline; radius: 9 }
+                    Keys.onReturnPressed: event => {
+                        if (event.modifiers & Qt.ControlModifier)
+                            root.saveQuickNote()
+                        else
+                            quickNoteBody.forceActiveFocus(Qt.TabFocusReason)
+                    }
+                    Keys.onEscapePressed: quickNotePopup.visible = false
+                }
+
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    TextArea {
+                        id: quickNoteBody
+                        placeholderText: "Write a note..."
+                        color: foreground
+                        placeholderTextColor: muted
+                        selectionColor: highlight
+                        wrapMode: TextEdit.Wrap
+                        font.family: "Noto Sans"
+                        font.pixelSize: 11 * root.menuFontScale
+                        leftPadding: 12
+                        rightPadding: 12
+                        topPadding: 10
+                        bottomPadding: 10
+                        background: Rectangle { color: settingsSurface; border.width: 1; border.color: quickNoteBody.activeFocus ? accent : settingsOutline; radius: 9 }
+                        Keys.onPressed: event => {
+                            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
+                                root.saveQuickNote()
+                                event.accepted = true
+                            }
+                        }
+                        Keys.onEscapePressed: quickNotePopup.visible = false
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: quickNoteBody.length + " characters"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 8 }
+                    Item { Layout.fillWidth: true }
+                    Text { text: "Ctrl+Enter to save"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 8 }
+                    Button {
+                        implicitWidth: 78
+                        implicitHeight: 34
+                        text: "Save"
+                        enabled: quickNoteTitle.text.trim().length > 0 || quickNoteBody.text.trim().length > 0
+                        onClicked: root.saveQuickNote()
+                        contentItem: Text { text: parent.text; color: parent.enabled ? background : muted; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9; font.weight: Font.DemiBold }
+                        background: Rectangle { radius: 9; color: parent.enabled ? (parent.down ? foreground : accent) : settingsSurface; border.width: 1; border.color: parent.enabled ? accent : settingsOutline }
+                    }
+                }
+            }
+        }
+    }
 
     PopupWindow {
         id: calendarPopup
@@ -2185,7 +2595,7 @@ ShellRoot {
         id: bluetoothPopup
         visible: false
         anchor.window: bar
-        anchor.rect.x: bar.width - tailscalePopup.implicitWidth - 10
+        anchor.rect.x: bar.width - bluetoothPopup.implicitWidth - 10
         anchor.rect.y: bar.height + 2
         grabFocus: true
         color: "transparent"
@@ -2271,7 +2681,7 @@ ShellRoot {
         id: tailscalePopup
         visible: false
         anchor.window: bar
-        anchor.rect.x: bar.width - exitNodePopup.implicitWidth - 10
+        anchor.rect.x: bar.width - tailscalePopup.implicitWidth - 10
         anchor.rect.y: bar.height + 2
         grabFocus: true
         color: "transparent"
@@ -2392,8 +2802,8 @@ ShellRoot {
         id: exitNodePopup
         visible: false
         anchor.window: networkPopup
-        anchor.rect.x: bar.width - bluetoothPopup.implicitWidth - 10
-        anchor.rect.y: bar.height + 2
+        anchor.rect.x: networkPopup.width - exitNodePopup.implicitWidth
+        anchor.rect.y: networkPopup.height + 4
         grabFocus: true
         color: "transparent"
         implicitWidth: 300 * menuScale
@@ -2638,7 +3048,7 @@ ShellRoot {
                     delegate: Rectangle {
                         required property var modelData
                         width: notificationList.width
-                        height: Math.max(90, notificationCardContent.implicitHeight + 24)
+                        height: notificationCardContent.implicitHeight + 24
                         radius: 8
                         color: "#171820"
                         clip: true
@@ -2727,7 +3137,7 @@ ShellRoot {
         anchor.rect.y: bar.height + 12
         color: "transparent"
         implicitWidth: 380
-        implicitHeight: toastNotification && toastNotification.actions.length > 0 ? 210 : 156
+        implicitHeight: notificationToastContent.implicitHeight + 28
 
         Rectangle {
             anchors.fill: parent
@@ -2739,7 +3149,10 @@ ShellRoot {
             clip: true
 
             ColumnLayout {
-                anchors.fill: parent
+                id: notificationToastContent
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.margins: 14
                 spacing: 4
 
@@ -3175,6 +3588,7 @@ ShellRoot {
         height: 250 * menuScale
 
         onVisibleChanged: {
+            response.clear()
             if (visible)
                 polkitFocusTimer.restart()
         }
@@ -3190,7 +3604,6 @@ ShellRoot {
             repeat: false
             onTriggered: {
                 polkitWindow.requestActivate()
-                root.floatActiveWindow(390 * root.menuScale, 250 * root.menuScale, 726, 390)
                 response.forceActiveFocus(Qt.OtherFocusReason)
                 response.selectAll()
             }
@@ -3249,7 +3662,7 @@ ShellRoot {
                         color: "#171820"
                         radius: 7
                         border.width: 1
-                        border.color: response.active ? accent : muted
+                        border.color: response.activeFocus ? accent : muted
                     }
                     Keys.onReturnPressed: if (submitButton.enabled) submitButton.clicked()
                     Keys.onEscapePressed: if (polkitAgent.flow) polkitAgent.flow.cancelAuthenticationRequest()
@@ -3311,8 +3724,11 @@ ShellRoot {
         }
     }
 
-    Window {
-        id: settingsWindow
+    Component {
+        id: legacySettingsComponent
+
+        Window {
+            id: legacySettingsWindow
         visible: false
         title: "Settings"
         x: root.centerX(width)
@@ -3330,7 +3746,7 @@ ShellRoot {
             color: settingsSurface
             border.width: 1
             border.color: settingsOutline
-            radius: 16
+            radius: 2
 
             RowLayout {
                 anchors.fill: parent
@@ -4028,7 +4444,10 @@ ShellRoot {
                 }
             }
         }
+        }
     }
+
+    SettingsWindow { id: settingsWindow; root: root }
 
     WallpaperViewer { id: wallpaperViewer; root: root }
 

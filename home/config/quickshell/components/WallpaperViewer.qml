@@ -15,7 +15,10 @@ Window {
     height: 600
 
     onVisibleChanged: if (visible) requestActivate()
-    Keys.onEscapePressed: visible = false
+    Shortcut {
+        sequence: "Escape"
+        onActivated: wallpaperViewer.visible = false
+    }
 
     Rectangle {
         anchors.fill: parent
