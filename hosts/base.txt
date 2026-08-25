@@ -2,6 +2,7 @@ git
 nix
 nix-daemon
 xorg-x11-server-Xorg
+xorg-x11-xinit
 bspwm
 sxhkd
 picom
@@ -10,7 +11,6 @@ zsh
 bat
 eza
 zoxide
-fastfetch
 maim
 feh
 xrandr
@@ -18,3 +18,4 @@ xsetroot
 xrdb
 wmname
 xdotool
+emacs

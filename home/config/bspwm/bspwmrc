@@ -7,8 +7,6 @@
 #
 
 # --- Environment ---
-export XCURSOR_SIZE=24
-export XCURSOR_THEME=Bibata-Modern-Ice
 export ELECTRON_OZONE_PLATFORM_HINT=x11
 export XDG_CURRENT_DESKTOP=bspwm
 

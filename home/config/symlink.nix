@@ -21,7 +21,7 @@ let
   };
 
   homeConfigs = {
-    ".Xresources" = ".Xresources";
+    ".xinitrc" = ".xinitrc";
   };
 in
 {

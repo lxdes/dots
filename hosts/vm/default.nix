@@ -14,6 +14,9 @@
     ../../modules/system/screenshot.nix
   ];
 
+  nux.cursor.size = 24;
+  nux.xftDpi = 96;
+
   # Add Nix packages needed only in the VM here.
   home.packages = [ ];
 }
