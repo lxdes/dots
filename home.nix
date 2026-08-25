@@ -1,6 +1,7 @@
 {
   config,
   pkgs,
+  hostProfile ? "generic",
   ...
 }:
 
@@ -11,6 +12,7 @@
 
   programs.home-manager.enable = true;
   home.enableNixpkgsReleaseCheck = false;
+  home.sessionVariables.NUX_HOST = hostProfile;
 
   targets.genericLinux.enable = true;
 

@@ -1,6 +1,5 @@
-#!/usr/bin/env sh
+#!/bin/bash
 
-output=$(xrandr --query | awk '$2 == "connected" { print $1; exit }')
-[ -n "$output" ] || exit 1
-
-xrandr --output "$output" --auto --primary
+xrandr --newmode "1920x1080" 173.00 1920 2048 2248 2576 1080 1083 1088 1120 -hsync +vsync
+xrandr --addmode Virtual1 1920x1080
+xrandr --output Virtual1 --mode 1920x1080
