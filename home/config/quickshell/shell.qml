@@ -1240,17 +1240,6 @@ ShellRoot {
                 }
 
                 Text {
-                    text: root.layoutIcon(root.bspLayout)
-                    color: foreground
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 16
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.togglePopup(layoutPopup)
-                    }
-                }
-
-                Text {
                     text: "󰂚"
                     color: foreground
                     font.family: "JetBrains Mono"
