@@ -2,5 +2,7 @@ qemu-guest-agent
 spice-vdagent
 spice-webdavd
 mesa-dri-drivers
+mesa-vulkan-drivers
 mesa-libGL
 mesa-libEGL
+vulkan-loader

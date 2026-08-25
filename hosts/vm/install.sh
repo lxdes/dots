@@ -28,6 +28,10 @@ if ((${#packages[@]})); then
   sudo dnf install "${packages[@]}"
 fi
 
+sudo dnf install -y --allowerasing \
+  xlibre-xserver \
+  xlibre-xf86-input-libinput \
+  xlibre-xf86-video-qxl
 sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
 sudo systemctl enable --now qemu-guest-agent.service

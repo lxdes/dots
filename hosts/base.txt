@@ -1,6 +1,7 @@
 git
 nix
 nix-daemon
+xorg-x11-server-Xorg
 bspwm
 sxhkd
 picom
@@ -13,3 +14,7 @@ fastfetch
 maim
 feh
 xrandr
+xsetroot
+xrdb
+wmname
+xdotool
