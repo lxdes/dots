@@ -328,6 +328,11 @@ ShellRoot {
         run(["feh", "--bg-fill", path])
     }
 
+    function clearWallpaper() {
+        run(["notify-send", "Wallpaper cleared", "Please set a new wallpaper"])
+        selectedWallpaper = ""
+    }
+
     function setIconTheme(theme) {
         currentIconTheme = theme
         run(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", theme])
@@ -3584,8 +3589,8 @@ ShellRoot {
         flags: Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
         modality: Qt.ApplicationModal
         color: "transparent"
-        width: 390 * menuScale
-        height: 250 * menuScale
+        width: 320 * menuScale
+        height: 200 * menuScale
 
         onVisibleChanged: {
             response.clear()
@@ -3618,34 +3623,34 @@ ShellRoot {
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 18
-                spacing: 9
+                anchors.margins: 12
+                spacing: 6
 
-                    Text {
-                        text: polkitAgent.flow ? polkitAgent.flow.message : "Authentication required"
+                Text {
+                    text: polkitAgent.flow ? polkitAgent.flow.message : "Authentication required"
                     color: foreground
                     font.family: "JetBrains Mono"
-                        font.pixelSize: 14 * root.menuFontScale
+                    font.pixelSize: 12 * root.menuFontScale
                     font.weight: Font.DemiBold
                     wrapMode: Text.Wrap
                     Layout.fillWidth: true
                 }
 
-                    Text {
-                        text: polkitAgent.flow ? polkitAgent.flow.supplementaryMessage : ""
+                Text {
+                    text: polkitAgent.flow ? polkitAgent.flow.supplementaryMessage : ""
                     color: polkitAgent.flow && polkitAgent.flow.supplementaryIsError ? "#f38ba8" : muted
                     font.family: "JetBrains Mono"
-                        font.pixelSize: 10 * root.menuFontScale
+                    font.pixelSize: 9 * root.menuFontScale
                     wrapMode: Text.Wrap
                     visible: text.length > 0
                     Layout.fillWidth: true
                 }
 
-                    Text {
-                        text: polkitAgent.flow ? polkitAgent.flow.inputPrompt : "Password"
+                Text {
+                    text: polkitAgent.flow ? polkitAgent.flow.inputPrompt : "Password"
                     color: muted
                     font.family: "JetBrains Mono"
-                        font.pixelSize: 10 * root.menuFontScale
+                    font.pixelSize: 9 * root.menuFontScale
                     visible: polkitAgent.flow ? polkitAgent.flow.isResponseRequired : true
                 }
 
@@ -3653,14 +3658,15 @@ ShellRoot {
                     id: response
                     Layout.fillWidth: true
                     echoMode: polkitAgent.flow && polkitAgent.flow.responseVisible ? TextInput.Normal : TextInput.Password
+                    placeholderTextColor: muted
                     placeholderText: "Enter password"
                     color: foreground
                     selectionColor: highlight
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 12
+                    font.pixelSize: 11
                     background: Rectangle {
                         color: "#171820"
-                        radius: 7
+                        radius: 5
                         border.width: 1
                         border.color: response.activeFocus ? accent : muted
                     }
@@ -3668,15 +3674,13 @@ ShellRoot {
                     Keys.onEscapePressed: if (polkitAgent.flow) polkitAgent.flow.cancelAuthenticationRequest()
                 }
 
-                Item { Layout.fillHeight: true }
-
                 RowLayout {
                     Layout.alignment: Qt.AlignRight
-                    spacing: 10
+                    spacing: 8
 
                     Button {
-                        implicitWidth: 88
-                        implicitHeight: 32
+                        implicitWidth: 70
+                        implicitHeight: 28
                         text: "Cancel"
                         onClicked: if (polkitAgent.flow) polkitAgent.flow.cancelAuthenticationRequest()
                         contentItem: Text {
@@ -3685,10 +3689,10 @@ ShellRoot {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             font.family: "JetBrains Mono"
-                            font.pixelSize: 10
+                            font.pixelSize: 9
                         }
                         background: Rectangle {
-                            radius: 7
+                            radius: 5
                             color: parent.pressed ? "#313244" : (parent.hovered ? "#252536" : "#171820")
                             border.width: 1
                             border.color: parent.hovered ? muted : "#373b41"
@@ -3697,8 +3701,8 @@ ShellRoot {
 
                     Button {
                         id: submitButton
-                        implicitWidth: 132
-                        implicitHeight: 32
+                        implicitWidth: 110
+                        implicitHeight: 28
                         text: "Authenticate"
                         highlighted: true
                         enabled: response.text.length > 0 && polkitAgent.flow !== null
@@ -3709,11 +3713,11 @@ ShellRoot {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             font.family: "JetBrains Mono"
-                            font.pixelSize: 10
+                            font.pixelSize: 9
                             font.weight: Font.DemiBold
                         }
                         background: Rectangle {
-                            radius: 7
+                            radius: 5
                             color: parent.pressed ? foreground : (parent.hovered ? foreground : accent)
                             border.width: 1
                             border.color: accent

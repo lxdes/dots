@@ -24,7 +24,10 @@ in
   xdg.configFile = builtins.mapAttrs (name: subpath: {
     source = create_symlink "${dotfiles}/${subpath}";
     recursive = true;
-  }) configs;
+  }) configs // {
+    "systemd/user/bspwm-session.target".source =
+      create_symlink "${dotfiles}/systemd/bspwm-session.target";
+  };
 
   home.file = builtins.mapAttrs (name: subpath: {
     source = create_symlink "${dotfiles}/${subpath}";

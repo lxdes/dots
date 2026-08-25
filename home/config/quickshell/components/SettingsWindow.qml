@@ -58,7 +58,6 @@ Window {
     component UiButton: Button {
         id: control
         property bool primary: false
-        property bool danger: false
 
         implicitHeight: 36
         leftPadding: 13
@@ -66,8 +65,7 @@ Window {
         contentItem: Text {
             text: control.text
             color: !control.enabled ? window.muted
-                : control.primary ? window.background
-                : control.danger ? "#f38ba8" : window.foreground
+                : control.primary ? window.background : window.foreground
             font.family: "JetBrains Mono"
             font.pixelSize: 9 * window.fontScale
             font.weight: control.primary ? Font.DemiBold : Font.Normal

@@ -1,4 +1,4 @@
-#+TITLE: Dots
+testing#+TITLE: Dots
 #+AUTHOR: LXDE
 
 [[file:images/overview.png]]
@@ -88,9 +88,9 @@ switches do not run DNF.
 Switch an existing profile manually:
 
 #+BEGIN_SRC bash
-home-manager switch --flake .#forda
-home-manager switch --flake .#vm
-home-manager switch --impure --flake .#generic
+home-manager switch --flake '.#forda'
+home-manager switch --flake '.#vm'
+home-manager switch --impure --flake '.#generic'
 #+END_SRC
 
 The generic profile requires =--impure= so Home Manager can read =$USER= and
@@ -98,9 +98,24 @@ The generic profile requires =--impure= so Home Manager can read =$USER= and
 
 Supplemental manual setup notes remain in [[file:install.org][install.org]].
 
+** Quickshell Integrations
+The calendar can show a read-only Proton Calendar agenda from a private ICS
+sharing URL. Store the URL outside the repository:
+
+#+BEGIN_SRC bash
+mkdir -p "$HOME/.config"
+printf '%s\n' 'https://calendar.proton.me/...' > "$HOME/.config/proton-calendar-url"
+chmod 600 "$HOME/.config/proton-calendar-url"
+#+END_SRC
+
+The URL grants read access to the shared calendar and must not be committed.
+Calendar data is cached for 15 minutes under =~/.cache/quickshell/=. Clipboard
+history is provided by CopyQ and opens with =Super+V=.
+
 ** Special Thanks 
 - [[https://gitlab.com/dwilliam62][Ddubsos]]
   - I highly recommend checking out [[ddubsOS][ddubsOS]] if you want to learn anything Nix!
   - Bought a book to learn Lua for Hyprland, trust this man with your life. 
 - [[https://github.com/bitterhalt][Bitterhalt]]
   - Goated dots.
+testing

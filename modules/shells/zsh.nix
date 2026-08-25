@@ -75,8 +75,8 @@ in
       cd = "z";
       dots = "z ~/nux";
       cat = "bat";
-      home = "cd && cd nux && nix flake update && home-manager switch ${homeManagerFlags}--flake .#${hostProfile}";
-      update = "sudo dnf upgrade --refresh && cd && cd nux && nix flake update && home-manager switch ${homeManagerFlags}--flake .#${hostProfile}";
+      home = "cd && cd nux && nix flake update && home-manager switch ${homeManagerFlags}--flake '.#${hostProfile}'";
+      update = "sudo dnf upgrade --refresh && cd && cd nux && nix flake update && home-manager switch ${homeManagerFlags}--flake '.#${hostProfile}'";
       ls = "eza -A --color=always --group-directories-first --icons";
       ll = "eza -Ahl --color=always --group-directories-first --icons";
       lt = "eza -aT --color=always --group-directories-first";

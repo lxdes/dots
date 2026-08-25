@@ -43,4 +43,6 @@ run qs -n -c default
 run udiskie
 
 # --- Apps ---
+run copyq
+(sleep 1; copyq config disable_tray true >/dev/null 2>&1) &
 run emacs --daemon

@@ -12,7 +12,9 @@
 | *super + shift + n*      | Open file manager (*dolphin*) |
 | *super + e*              | Open Emacs                           |
 | *super + b*              | Open Librewolf                       |
+| *super + o*              | Open OnlyOffice Desktop Editors      |
 | *super + space*          | Open Quickshell application menu       |
+| *super + v*              | Open searchable clipboard history     |
 | *super + c*              | Open color picker                    |
 | *super + m*              | Open music player (*feishin*) |
 | *super + d*              | Open Discord                         |

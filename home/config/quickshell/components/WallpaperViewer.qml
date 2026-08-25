@@ -25,7 +25,7 @@ Window {
         color: root.background
         border.width: 1
         border.color: "#373b41"
-        radius: 1
+        radius: 2
 
         ColumnLayout {
             anchors.fill: parent
@@ -38,15 +38,15 @@ Window {
                     text: "Wallpapers"
                     color: root.foreground
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 16 * root.menuFontScale
+                    font.pixelSize: 18 * root.menuFontScale
                     font.weight: Font.DemiBold
                 }
                 Item { Layout.fillWidth: true }
                 Text {
-                    text: "Click an image to apply  •  Esc to close"
+                    text: "Click to apply  •  Esc to close  •  Tab to navigate"
                     color: root.muted
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 10
+                    font.pixelSize: 11
                 }
             }
 
@@ -61,8 +61,8 @@ Window {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                cellWidth: 230
-                cellHeight: 190
+                cellWidth: 240
+                cellHeight: 200
                 model: root.wallpapers
 
                 delegate: Item {

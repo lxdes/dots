@@ -45,6 +45,9 @@ super + b
 super + space
 	qs ipc call launcher toggle
 
+super + shift + w
+	qs ipc call wallpaper toggle
+
 super + shift + c
       xcolor -f hex -s clipboard
 
