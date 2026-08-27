@@ -8,7 +8,8 @@ Window {
 
     required property var root
 
-    readonly property bool compactNavigation: width < 760
+    readonly property real uiScale: root.menuScale
+    readonly property bool compactNavigation: width < 760 * uiScale
     readonly property color background: root.background
     readonly property color foreground: root.foreground
     readonly property color muted: root.muted
@@ -24,11 +25,11 @@ Window {
     color: "transparent"
     width: {
         const screen = root.primaryScreen()
-        return screen ? Math.max(1, Math.min(1040, screen.width - 32)) : 980
+        return screen ? Math.max(1, Math.min(1040 * uiScale, screen.width - 32)) : 980 * uiScale
     }
     height: {
         const screen = root.primaryScreen()
-        return screen ? Math.max(1, Math.min(720, screen.height - 48)) : 680
+        return screen ? Math.max(1, Math.min(720 * uiScale, screen.height - 48)) : 680 * uiScale
     }
     x: root.centerX(width)
     y: root.centerY(height)
@@ -59,9 +60,9 @@ Window {
         id: control
         property bool primary: false
 
-        implicitHeight: 36
-        leftPadding: 13
-        rightPadding: 13
+        implicitHeight: 36 * window.uiScale
+        leftPadding: 13 * window.uiScale
+        rightPadding: 13 * window.uiScale
         contentItem: Text {
             text: control.text
             color: !control.enabled ? window.muted
@@ -74,7 +75,7 @@ Window {
             elide: Text.ElideRight
         }
         background: Rectangle {
-            radius: 9
+            radius: 9 * window.uiScale
             color: !control.enabled ? Qt.rgba(window.raised.r, window.raised.g, window.raised.b, 0.35)
                 : control.primary ? (control.down ? Qt.darker(window.accent, 1.12) : window.accent)
                 : control.down ? Qt.lighter(window.raised, 1.12)
@@ -86,12 +87,12 @@ Window {
 
     component UiSlider: Slider {
         id: control
-        implicitHeight: 32
+        implicitHeight: 32 * window.uiScale
         background: Rectangle {
             x: control.leftPadding
             y: control.topPadding + control.availableHeight / 2 - height / 2
             width: control.availableWidth
-            height: 4
+            height: 4 * window.uiScale
             radius: 2
             color: window.outline
             Rectangle {
@@ -104,9 +105,9 @@ Window {
         handle: Rectangle {
             x: control.leftPadding + control.visualPosition * (control.availableWidth - width)
             y: control.topPadding + control.availableHeight / 2 - height / 2
-            implicitWidth: 18
-            implicitHeight: 18
-            radius: 9
+            implicitWidth: 18 * window.uiScale
+            implicitHeight: 18 * window.uiScale
+            radius: 9 * window.uiScale
             color: control.pressed ? window.foreground : window.accent
             border.width: 3
             border.color: window.surface
@@ -115,25 +116,25 @@ Window {
 
     component UiSwitch: Switch {
         id: control
-        implicitWidth: 46
-        implicitHeight: 32
+        implicitWidth: 46 * window.uiScale
+        implicitHeight: 32 * window.uiScale
         indicator: Rectangle {
             x: control.width - width
             anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: 42
-            implicitHeight: 24
-            radius: 12
+            implicitWidth: 42 * window.uiScale
+            implicitHeight: 24 * window.uiScale
+            radius: 12 * window.uiScale
             color: control.checked ? window.accent : window.outline
             border.width: control.activeFocus ? 1 : 0
             border.color: window.foreground
             Rectangle {
-                x: control.checked ? parent.width - width - 4 : 4
+                x: control.checked ? parent.width - width - 4 * window.uiScale : 4 * window.uiScale
                 anchors.verticalCenter: parent.verticalCenter
-                width: 16
-                height: 16
-                radius: 8
+                width: 16 * window.uiScale
+                height: 16 * window.uiScale
+                radius: 8 * window.uiScale
                 color: control.checked ? window.background : window.muted
-                Behavior on x { NumberAnimation { duration: 110 } }
+                Behavior on x { enabled: !window.root.reducedMotion; NumberAnimation { duration: 110 } }
             }
         }
         contentItem: Item {}
@@ -141,10 +142,10 @@ Window {
 
     component UiCombo: ComboBox {
         id: control
-        implicitHeight: 36
-        implicitWidth: 180
-        leftPadding: 12
-        rightPadding: 32
+        implicitHeight: 36 * window.uiScale
+        implicitWidth: 180 * window.uiScale
+        leftPadding: 12 * window.uiScale
+        rightPadding: 32 * window.uiScale
         contentItem: DataText {
             text: control.displayText
             color: window.foreground
@@ -158,7 +159,7 @@ Window {
             font.pixelSize: 12
         }
         background: Rectangle {
-            radius: 9
+            radius: 9 * window.uiScale
             color: control.hovered ? window.raised : window.surface
             border.width: 1
             border.color: control.activeFocus ? window.accent : window.outline
@@ -166,7 +167,7 @@ Window {
         delegate: ItemDelegate {
             required property var modelData
             width: control.width
-            height: 34
+            height: 34 * window.uiScale
             contentItem: DataText {
                 text: control.textRole ? modelData[control.textRole] : modelData
                 color: highlighted ? window.background : window.foreground
@@ -179,8 +180,8 @@ Window {
         popup: Popup {
             y: control.height + 4
             width: control.width
-            implicitHeight: Math.min(contentItem.implicitHeight + 8, 260)
-            padding: 4
+            implicitHeight: Math.min(contentItem.implicitHeight + 8 * window.uiScale, 260 * window.uiScale)
+            padding: 4 * window.uiScale
             contentItem: ListView {
                 clip: true
                 implicitHeight: contentHeight
@@ -192,23 +193,23 @@ Window {
                 color: window.surface
                 border.width: 1
                 border.color: window.outline
-                radius: 9
+                radius: 9 * window.uiScale
             }
         }
     }
 
     component SettingsCard: Rectangle {
         default property alias contents: body.data
-        implicitHeight: body.implicitHeight + 28
+        implicitHeight: body.implicitHeight + 28 * window.uiScale
         color: window.surface
         border.width: 1
         border.color: window.outline
-        radius: 12
+        radius: 12 * window.uiScale
         ColumnLayout {
             id: body
             anchors.fill: parent
-            anchors.margins: 14
-            spacing: 8
+            anchors.margins: 14 * window.uiScale
+            spacing: 8 * window.uiScale
         }
     }
 
@@ -408,6 +409,7 @@ Window {
                                 onClicked: root.refreshAudioDevices()
                             }
                         }
+                        DataText { visible: root.audioActionError.length > 0; Layout.fillWidth: true; text: root.audioActionError; color: "#f38ba8"; wrapMode: Text.Wrap }
                         GridLayout {
                             Layout.fillWidth: true
                             columns: audioPage.availableWidth < 610 ? 1 : 2
@@ -465,7 +467,7 @@ Window {
                                         color: window.foreground
                                         elide: Text.ElideRight
                                     }
-                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.setDefaultSink(parent.modelData.name) }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: !root.audioActionBusy; onClicked: root.setDefaultSink(parent.modelData.name) }
                                 }
                             }
                             EmptyState {
@@ -495,7 +497,7 @@ Window {
                                         color: window.foreground
                                         elide: Text.ElideRight
                                     }
-                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.setDefaultSource(parent.modelData.name) }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: !root.audioActionBusy; onClicked: root.setDefaultSource(parent.modelData.name) }
                                 }
                             }
                             EmptyState {
@@ -531,6 +533,7 @@ Window {
                                 DataText { Layout.fillWidth: true; text: "↑ UP       " + root.networkUploadMbps.toFixed(2) + " Mbps"; color: window.foreground }
                             }
                         }
+                        DataText { visible: root.networkActionError.length > 0; Layout.fillWidth: true; text: root.networkActionError; color: "#f38ba8"; wrapMode: Text.Wrap }
 
                         SettingsCard {
                             Layout.fillWidth: true
@@ -547,8 +550,9 @@ Window {
                                 }
                                 UiSwitch {
                                     visible: root.wifiAvailable
+                                    enabled: !root.networkActionBusy
                                     checked: root.wifiEnabled
-                                    onToggled: root.setWifiEnabled(checked)
+                                    onClicked: root.setWifiEnabled(checked)
                                 }
                             }
                             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: window.outline }
@@ -569,6 +573,7 @@ Window {
                                 Repeater {
                                     model: root.networkDevices
                                     delegate: Rectangle {
+                                        id: networkDelegate
                                         required property var modelData
                                         Layout.fillWidth: true
                                         implicitHeight: 46
@@ -576,14 +581,22 @@ Window {
                                         color: modelData.active ? window.raised : Qt.rgba(window.raised.r, window.raised.g, window.raised.b, 0.35)
                                         border.width: 1
                                         border.color: modelData.active ? window.accent : window.outline
+                                        activeFocusOnTab: true
+                                        Accessible.role: Accessible.Button
+                                        Accessible.name: (modelData.active ? "Connected network " : "Connect to network ") + modelData.ssid
+                                        Keys.onReturnPressed: root.connectNetwork(modelData.ssid, modelData.security, modelData.active, modelData.profileUuid)
                                         RowLayout {
                                             anchors.fill: parent
                                             anchors.margins: 11
-                                            DataText { text: parent.parent.modelData.active ? "●" : "○"; color: parent.parent.modelData.active ? window.accent : window.muted }
-                                            UiText { Layout.fillWidth: true; text: parent.parent.modelData.ssid; elide: Text.ElideRight }
-                                            DataText { text: parent.parent.modelData.signal + "%  " + parent.parent.modelData.security }
+                                            DataText { text: networkDelegate.modelData.active ? "●" : "○"; color: networkDelegate.modelData.active ? window.accent : window.muted }
+                                            UiText { Layout.fillWidth: true; text: networkDelegate.modelData.ssid; elide: Text.ElideRight }
+                                            ColumnLayout {
+                                                spacing: 0
+                                                DataText { text: networkDelegate.modelData.signal + "%  " + networkDelegate.modelData.security }
+                                                DataText { visible: networkDelegate.modelData.profileName.length > 0; text: "SAVED"; color: window.accent; font.pixelSize: 8 }
+                                            }
                                         }
-                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.connectNetwork(parent.modelData.ssid) }
+                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: !root.networkActionBusy; onClicked: root.connectNetwork(networkDelegate.modelData.ssid, networkDelegate.modelData.security, networkDelegate.modelData.active, networkDelegate.modelData.profileUuid) }
                                     }
                                 }
                                 EmptyState {
@@ -607,7 +620,7 @@ Window {
                                     DataText { text: root.tailscaleState + "  ·  " + root.tailscaleNodes.length + " peers"; color: root.tailscaleState === "Running" ? "#a6e3a1" : window.muted }
                                 }
                                 UiButton { text: "󰑐"; ToolTip.visible: hovered; ToolTip.text: "Refresh VPN status"; onClicked: root.refreshVpnSettings() }
-                                UiSwitch { checked: root.tailscaleState === "Running"; onToggled: root.setTailscaleEnabled(checked) }
+                                UiSwitch { enabled: !root.networkActionBusy; checked: root.tailscaleState === "Running"; onClicked: root.setTailscaleEnabled(checked) }
                             }
                             GridLayout {
                                 Layout.fillWidth: true
@@ -725,16 +738,24 @@ Window {
                         PageHeader { Layout.fillWidth: true; title: "Bluetooth"; description: "Discover nearby devices and hand off pairing to bluetui." }
                         SettingsCard {
                             Layout.fillWidth: true
-                            DataText { text: "STATUS"; color: window.accent; font.weight: Font.DemiBold }
-                            UiText { Layout.fillWidth: true; text: root.bluetoothDetail || "No connected devices"; font.pixelSize: 16 * window.fontScale; font.weight: Font.DemiBold; wrapMode: Text.Wrap }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    DataText { text: "STATUS"; color: window.accent; font.weight: Font.DemiBold }
+                                    UiText { Layout.fillWidth: true; text: !root.bluetoothAvailable ? "No Bluetooth adapter" : root.bluetoothEnabled ? (root.bluetoothDetail || "No connected devices") : "Bluetooth disabled"; font.pixelSize: 16 * window.fontScale; font.weight: Font.DemiBold; wrapMode: Text.Wrap }
+                                }
+                                UiSwitch { visible: root.bluetoothAvailable; enabled: !root.bluetoothActionBusy; checked: root.bluetoothEnabled; onClicked: root.setBluetoothEnabled(checked) }
+                            }
                             DataText { Layout.fillWidth: true; text: "Select a device to connect. Use bluetui to pair or remove devices."; wrapMode: Text.Wrap }
                         }
+                        DataText { visible: root.bluetoothActionError.length > 0; Layout.fillWidth: true; text: root.bluetoothActionError; color: "#f38ba8"; wrapMode: Text.Wrap }
                         RowLayout {
                             Layout.fillWidth: true
-                            DataText { text: "NEARBY DEVICES"; color: window.accent; font.weight: Font.DemiBold }
+                            DataText { text: "KNOWN DEVICES"; color: window.accent; font.weight: Font.DemiBold }
                             Item { Layout.fillWidth: true }
                             UiButton { text: "Open bluetui"; onClicked: root.run(["wezterm", "-e", "bluetui"]) }
-                            UiButton { text: root.bluetoothScanning ? "Scanning..." : "󰑐  Scan"; enabled: !root.bluetoothScanning; onClicked: root.refreshBluetoothDevices() }
+                            UiButton { text: root.bluetoothScanning ? "Scanning..." : "󰑐  Scan"; enabled: root.bluetoothEnabled && !root.bluetoothScanning && !root.bluetoothActionBusy; onClicked: root.refreshBluetoothDevices() }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
@@ -742,6 +763,7 @@ Window {
                             Repeater {
                                 model: root.bluetoothDevices
                                 delegate: Rectangle {
+                                    id: bluetoothDelegate
                                     required property var modelData
                                     Layout.fillWidth: true
                                     implicitHeight: 52
@@ -749,6 +771,10 @@ Window {
                                     color: window.surface
                                     border.width: 1
                                     border.color: window.outline
+                                    activeFocusOnTab: true
+                                    Accessible.role: Accessible.Button
+                                    Accessible.name: (modelData.connected ? "Disconnect " : "Connect ") + (modelData.name || modelData.address)
+                                    Keys.onReturnPressed: root.connectBluetooth(modelData.address, modelData.connected, modelData.paired)
                                     RowLayout {
                                         anchors.fill: parent
                                         anchors.margins: 11
@@ -756,12 +782,16 @@ Window {
                                         ColumnLayout {
                                             Layout.fillWidth: true
                                             spacing: 1
-                                            UiText { Layout.fillWidth: true; text: parent.parent.parent.modelData.name || "Unknown device"; elide: Text.ElideRight }
-                                            DataText { text: parent.parent.parent.modelData.address }
+                                            UiText { Layout.fillWidth: true; text: bluetoothDelegate.modelData.name || "Unknown device"; elide: Text.ElideRight }
+                                            DataText {
+                                                text: bluetoothDelegate.modelData.address
+                                                    + (bluetoothDelegate.modelData.battery >= 0 ? "  ·  " + bluetoothDelegate.modelData.battery + "%" : "")
+                                                    + (bluetoothDelegate.modelData.paired ? "  ·  PAIRED" : "  ·  NEW")
+                                            }
                                         }
-                                        DataText { text: "CONNECT  ›"; color: window.accent }
+                                        DataText { text: bluetoothDelegate.modelData.connected ? "DISCONNECT  ›" : bluetoothDelegate.modelData.paired ? "CONNECT  ›" : "PAIR  ›"; color: window.accent }
                                     }
-                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.connectBluetooth(parent.modelData.address) }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: !root.bluetoothActionBusy; onClicked: root.connectBluetooth(bluetoothDelegate.modelData.address, bluetoothDelegate.modelData.connected, bluetoothDelegate.modelData.paired) }
                                 }
                             }
                             EmptyState {
@@ -780,6 +810,7 @@ Window {
                         width: displaysPage.availableWidth
                         spacing: 12
                         PageHeader { Layout.fillWidth: true; title: "Displays"; description: "Choose the primary monitor and configure connected outputs." }
+                        DataText { visible: root.displayActionError.length > 0; Layout.fillWidth: true; text: root.displayActionError; color: "#f38ba8"; wrapMode: Text.Wrap }
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 8
@@ -796,7 +827,7 @@ Window {
                                             Layout.fillWidth: true
                                             spacing: 1
                                             UiText { Layout.fillWidth: true; text: modelData.name + (modelData.primary ? "  ·  Primary" : ""); font.weight: Font.DemiBold; elide: Text.ElideRight }
-                                            DataText { text: modelData.mode + "  /  " + modelData.refresh + " Hz" }
+                                            DataText { text: modelData.active ? modelData.mode + "  /  " + modelData.refresh + " Hz" : "Connected, disabled" }
                                         }
                                     }
                                     GridLayout {
@@ -807,15 +838,18 @@ Window {
                                         UiButton {
                                             Layout.fillWidth: true
                                             text: modelData.primary ? "Primary display" : "Set as primary"
-                                            enabled: !modelData.primary
+                                            enabled: modelData.active && !modelData.primary && !root.displayActionBusy
                                             onClicked: root.setPrimaryDisplay(modelData.name)
                                         }
                                         UiCombo {
                                             Layout.fillWidth: true
+                                            enabled: modelData.modes.length > 0 && !root.displayActionBusy
                                             model: modelData.modes
                                             textRole: "label"
                                             currentIndex: Math.max(0, modelData.modes.findIndex(option => option.selected))
                                             onActivated: index => {
+                                                if (index < 0 || index >= modelData.modes.length)
+                                                    return
                                                 const option = modelData.modes[index]
                                                 root.setDisplayMode(modelData.name, option.mode, option.refresh)
                                             }
@@ -868,20 +902,50 @@ Window {
                         SettingsCard {
                             Layout.fillWidth: true
                             DataText { text: "QUICKSHELL INTERFACE"; color: window.accent; font.weight: Font.DemiBold }
+                            UiText { Layout.fillWidth: true; text: "Display preset"; font.weight: Font.DemiBold }
+                            DataText { Layout.fillWidth: true; text: "Scale the bar, popups, settings, launcher, and text together."; wrapMode: Text.Wrap }
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: appearancePage.availableWidth < 560 * window.uiScale ? 2 : 4
+                                columnSpacing: 6 * window.uiScale
+                                rowSpacing: 6 * window.uiScale
+                                UiButton { Layout.fillWidth: true; text: "Compact"; primary: Math.abs(root.menuScale - 0.85) < 0.01; onClicked: root.applyInterfacePreset(0.85) }
+                                UiButton { Layout.fillWidth: true; text: "Standard"; primary: Math.abs(root.menuScale - 1.0) < 0.01; onClicked: root.applyInterfacePreset(1.0) }
+                                UiButton { Layout.fillWidth: true; text: "HiDPI"; primary: Math.abs(root.menuScale - 1.5) < 0.01; onClicked: root.applyInterfacePreset(1.5) }
+                                UiButton { Layout.fillWidth: true; text: "4K"; primary: Math.abs(root.menuScale - 2.0) < 0.01; onClicked: root.applyInterfacePreset(2.0) }
+                            }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: window.outline }
                             RowLayout {
                                 Layout.fillWidth: true
-                                UiText { text: "Panel height" }
+                                UiText { text: "Base panel height" }
                                 Item { Layout.fillWidth: true }
-                                DataText { text: root.panelHeight + " px"; color: window.accent }
+                                DataText { text: root.panelHeight + " px  /  " + root.effectivePanelHeight + " px scaled"; color: window.accent }
                             }
-                            UiSlider { Layout.fillWidth: true; from: 24; to: 48; stepSize: 1; value: root.panelHeight; onMoved: root.setPanelHeight(value) }
+                            UiSlider { Layout.fillWidth: true; from: 24; to: 64; stepSize: 1; value: root.panelHeight; onMoved: root.setPanelHeight(value) }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                UiText { text: "Interface scale" }
+                                Item { Layout.fillWidth: true }
+                                DataText { text: root.menuScale.toFixed(2) + "x"; color: window.accent }
+                            }
+                            UiSlider { Layout.fillWidth: true; from: 0.75; to: 2.5; stepSize: 0.05; value: root.menuScale; onMoved: root.setMenuScale(value) }
                             RowLayout {
                                 Layout.fillWidth: true
                                 UiText { text: "Text scale" }
                                 Item { Layout.fillWidth: true }
-                                DataText { text: root.menuFontScale.toFixed(1) + "x"; color: window.accent }
+                                DataText { text: root.menuFontScale.toFixed(2) + "x"; color: window.accent }
                             }
-                            UiSlider { Layout.fillWidth: true; from: 0.9; to: 1.5; stepSize: 0.1; value: root.menuFontScale; onMoved: root.setMenuFontScale(value) }
+                            UiSlider { Layout.fillWidth: true; from: 0.75; to: 2.5; stepSize: 0.05; value: root.menuFontScale; onMoved: root.setMenuFontScale(value) }
+                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: window.outline }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    UiText { text: "Reduced motion" }
+                                    DataText { text: "Disable nonessential interface animation" }
+                                }
+                                UiSwitch { checked: root.reducedMotion; onClicked: root.setReducedMotion(checked) }
+                            }
                         }
                         DataText { Layout.fillWidth: true; text: "BSPWM gaps, borders, and compositor behavior remain managed by their configuration files."; wrapMode: Text.Wrap }
                         Item { Layout.preferredHeight: 2 }
@@ -894,6 +958,21 @@ Window {
                         width: sessionPage.availableWidth
                         spacing: 12
                         PageHeader { Layout.fillWidth: true; title: "Session"; description: "Power controls and local hardware preferences." }
+                        SettingsCard {
+                            Layout.fillWidth: true
+                            DataText { text: "SYSTEM LOAD"; color: window.accent; font.weight: Font.DemiBold }
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: sessionPage.availableWidth < 560 ? 2 : 4
+                                columnSpacing: 12
+                                rowSpacing: 8
+                                DataText { Layout.fillWidth: true; text: "CPU  " + (root.cpuPercent >= 0 ? root.cpuPercent.toFixed(1) + "%" : "Unavailable"); color: window.foreground }
+                                DataText { Layout.fillWidth: true; text: "RAM  " + (root.memoryPercent >= 0 ? root.memoryPercent.toFixed(1) + "%" : "Unavailable"); color: window.foreground }
+                                DataText { Layout.fillWidth: true; text: "TEMP  " + (root.temperatureC >= 0 ? root.temperatureC.toFixed(1) + "°C" : "Unavailable"); color: window.foreground }
+                                DataText { Layout.fillWidth: true; text: "GPU  " + (root.gpuPercent >= 0 ? root.gpuPercent.toFixed(0) + "%" : "Unavailable"); color: window.foreground }
+                            }
+                            DataText { Layout.fillWidth: true; text: "POWER PROFILE  " + root.powerProfile.toUpperCase(); color: window.muted }
+                        }
                         GridLayout {
                             Layout.fillWidth: true
                             columns: sessionPage.availableWidth < 580 ? 1 : 3
@@ -921,7 +1000,7 @@ Window {
                                     UiText { text: "Touchpad" }
                                     DataText { text: root.touchpadAvailable ? (root.touchpadEnabled ? "Enabled" : "Disabled") : "Unavailable" }
                                 }
-                                UiSwitch { visible: root.touchpadAvailable; checked: root.touchpadEnabled; onToggled: root.toggleTouchpad(checked) }
+                                UiSwitch { visible: root.touchpadAvailable; checked: root.touchpadEnabled; onClicked: root.toggleTouchpad(checked) }
                             }
                         }
                         SettingsCard {

@@ -11,12 +11,16 @@ Window {
     y: root.centerY(height)
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     color: "transparent"
-    width: 760
-    height: 600
+    width: root.primaryScreen() ? Math.max(1, Math.min(760, root.primaryScreen().width - 32)) : 760
+    height: root.primaryScreen() ? Math.max(1, Math.min(600, root.primaryScreen().height - 48)) : 600
 
-    onVisibleChanged: if (visible) requestActivate()
+    onVisibleChanged: if (visible) {
+        requestActivate()
+        wallpaperGrid.forceActiveFocus(Qt.OtherFocusReason)
+    }
     Shortcut {
         sequence: "Escape"
+        context: Qt.WindowShortcut
         onActivated: wallpaperViewer.visible = false
     }
 
@@ -43,7 +47,7 @@ Window {
                 }
                 Item { Layout.fillWidth: true }
                 Text {
-                    text: "Click to apply  •  Esc to close  •  Tab to navigate"
+                    text: "Click or Enter to apply  •  Esc to close  •  Arrows to navigate"
                     color: root.muted
                     font.family: "JetBrains Mono"
                     font.pixelSize: 11
@@ -61,14 +65,21 @@ Window {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                cellWidth: 240
-                cellHeight: 200
+                cellWidth: width / Math.max(1, Math.floor(width / 220))
+                cellHeight: Math.max(150, cellWidth * 0.78)
                 model: root.wallpapers
+                currentIndex: count > 0 ? 0 : -1
+                focus: true
+
+                Keys.onReturnPressed: if (currentIndex >= 0) root.applyWallpaper(root.wallpapers[currentIndex])
+                Keys.onEnterPressed: if (currentIndex >= 0) root.applyWallpaper(root.wallpapers[currentIndex])
 
                 delegate: Item {
                     required property string modelData
                     width: wallpaperGrid.cellWidth - 10
                     height: wallpaperGrid.cellHeight - 10
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Apply wallpaper " + modelData.split("/").pop()
 
                     Rectangle {
                         anchors.fill: parent
@@ -78,9 +89,23 @@ Window {
                         clip: true
 
                         Image {
+                            id: thumbnail
                             anchors.fill: parent
                             source: modelData
                             fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: false
+                            sourceSize.width: Math.ceil(width)
+                            sourceSize.height: Math.ceil(height)
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: thumbnail.status === Image.Error
+                            text: "Preview unavailable"
+                            color: root.muted
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 10
                         }
 
                         Rectangle {
@@ -108,8 +133,8 @@ Window {
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: {
+                                wallpaperGrid.currentIndex = index
                                 root.applyWallpaper(modelData)
-                                root.run(["notify-send", "Wallpaper applied", modelData.split("/").pop()])
                             }
                         }
                     }

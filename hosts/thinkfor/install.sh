@@ -45,7 +45,7 @@ if ! grep -qxF 'experimental-features = nix-command flakes' "$HOME/.config/nix/n
 	printf '%s\n' 'experimental-features = nix-command flakes' >>"$HOME/.config/nix/nix.conf"
 fi
 
-nix run github:nix-community/home-manager -- switch --flake "$repo_root#serfor"
+nix run github:nix-community/home-manager -- switch --flake "$repo_root#thinkfor"
 
 if [[ ! -d "$HOME/.config/emacs/.git" ]]; then
 	git clone --depth 1 https://github.com/doomemacs/core "$HOME/.config/emacs"

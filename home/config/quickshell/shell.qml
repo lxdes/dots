@@ -21,31 +21,48 @@ ShellRoot {
     readonly property color settingsSurface: Qt.darker(background, 0.82)
     readonly property color settingsRaised: Qt.lighter(settingsSurface, 1.16)
     readonly property color settingsOutline: Qt.lighter(background, 1.34)
-    readonly property real menuScale: 1.0
+    property real menuScale: 1.0
+    readonly property string configDirectory: {
+        let directory = String(Quickshell.shellDir || "")
+        if (directory.startsWith("file://"))
+            directory = directory.slice(7)
+        return directory
+    }
     property real menuFontScale: 1.2
+    readonly property real displayFontScale: menuFontScale / 1.2
     property int panelHeight: 32
-    property bool compositorEnabled: true
+    readonly property int effectivePanelHeight: Math.round(panelHeight * menuScale)
+    property bool reducedMotion: false
     property string currentIconTheme: "Papirus-Dark"
     property string currentGtkTheme: "Adwaita"
     property var gtkThemes: ["Adwaita", "Adwaita-dark"]
 
-    property string activeDesktop: "1"
+    property string activeDesktop: WmState.activeDesktop || "1"
     property bool quickNoteCentered: false
-    property string activeTitle: "Desktop"
-    property string audioStatus: ""
+    property string activeTitle: WmState.activeTitle
+    readonly property var defaultSinkAudio: audioService.defaultSinkAudio
+    readonly property var defaultSourceAudio: audioService.defaultSourceAudio
+    property string audioStatus: defaultSinkAudio ? (defaultSinkAudio.muted ? "󰝟" : "󰕾") : "󰖁"
     property string networkStatus: ""
     property string bluetoothStatus: ""
     property string audioDetail: "Default sink"
     property string networkDetail: "Disconnected"
     property string bluetoothDetail: "No connected devices"
-    property var currentPlayer: null
+    property var currentPlayer: {
+        const players = Mpris.players.values
+        for (const player of players) {
+            if (player && player.isPlaying)
+                return player
+        }
+        return players.length > 0 ? players[0] : null
+    }
     property var wallpapers: []
     property string selectedWallpaper: ""
     property string settingsPage: "Audio"
     property string bspLayout: "tiled"
-    property int windowGap: 6
-    property int borderWidth: 2
-    property real volumeLevel: 50
+    property bool layoutActionBusy: false
+    property string layoutActionError: ""
+    property real volumeLevel: audioService.outputLevel
     property real pendingVolumeLevel: 50
     property bool volumeAdjusting: false
     property bool launcherVisible: false
@@ -68,11 +85,11 @@ ShellRoot {
     property bool wifiEnabled: false
     property string wifiDevice: ""
     property var vpnProfiles: []
-    property real micVolumeLevel: 0
+    property real micVolumeLevel: audioService.inputLevel
     property real pendingMicVolumeLevel: 0
     property bool micVolumeAdjusting: false
-    property bool micMuted: false
-    property bool outputMuted: false
+    property bool micMuted: audioService.inputMuted
+    property bool outputMuted: audioService.outputMuted
     property string micName: "Default microphone"
     property var audioSinks: []
     property var audioSources: []
@@ -80,15 +97,18 @@ ShellRoot {
     property bool audioSourcesLoading: false
     property string audioSinksError: ""
     property string audioSourcesError: ""
+    property bool audioActionBusy: false
+    property string audioActionError: ""
     property var bluetoothDevices: []
     property var networkDevices: []
+    property var wifiProfiles: ({})
     property var displays: []
     property string primaryDisplayName: ""
     property bool bluetoothScanning: false
     property bool networkScanning: false
     property string defaultSinkName: ""
     property string defaultSourceName: ""
-    property var workspaceStates: []
+    property var workspaceStates: WmState.workspaces
     property int batteryCapacity: -1
     property string batteryStatus: ""
     property real brightnessLevel: 60
@@ -98,6 +118,11 @@ ShellRoot {
     property int keyboardRepeatDelay: 300
     property int keyboardRepeatRate: 40
     property var toastNotification: null
+    property var toastRetainedNotification: null
+    property var notificationQueue: []
+    property var notificationTimes: ({})
+    property bool toastClearing: false
+    property bool doNotDisturb: false
     readonly property var powerActions: [
         { icon: "󰗼", label: "Logout", command: ["bspc", "quit"] },
         { icon: "󰐥", label: "Shutdown", command: ["systemctl", "poweroff"] },
@@ -115,11 +140,46 @@ ShellRoot {
     property int calendarYear: new Date().getFullYear()
     property int calendarMonth: new Date().getMonth()
     property string activeWindowId: ""
+    property string pendingActiveWindowId: ""
     property bool popupsReady: false
+    property bool noteSaving: false
+    property string noteSaveError: ""
+    property string pendingNoteContent: ""
+    property bool networkActionBusy: false
+    property string networkActionError: ""
+    property bool bluetoothActionBusy: false
+    property string bluetoothActionError: ""
+    property bool bluetoothAvailable: false
+    property bool bluetoothEnabled: false
+    property bool displayActionBusy: false
+    property string displayActionError: ""
+    property string displayRollbackScript: ""
+    property bool displayRefreshAfterCurrent: false
+    property bool displayRefreshPending: false
+    property int pendingPowerIndex: -1
+    property bool agendaConfigured: false
+    property string agendaError: ""
+    property var agendaEvents: []
+    property bool microphoneActive: false
+    property bool recordingActive: false
+    property bool screenShareActive: false
+    property real cpuPercent: -1
+    property real memoryPercent: -1
+    property real temperatureC: -1
+    property real gpuPercent: -1
+    property string powerProfile: "unknown"
+    property string operationErrorTitle: ""
+    property string operationErrorMessage: ""
+
+    onLayoutActionErrorChanged: if (layoutActionError.length > 0) showOperationError("Layout operation failed", layoutActionError)
+    onAudioActionErrorChanged: if (audioActionError.length > 0) showOperationError("Audio operation failed", audioActionError)
+    onNetworkActionErrorChanged: if (networkActionError.length > 0) showOperationError("Network operation failed", networkActionError)
+    onBluetoothActionErrorChanged: if (bluetoothActionError.length > 0) showOperationError("Bluetooth operation failed", bluetoothActionError)
+    onDisplayActionErrorChanged: if (displayActionError.length > 0) showOperationError("Display operation failed", displayActionError)
 
     Component.onCompleted: {
         popupsReady = true
-        refreshNowPlaying()
+        refreshDisplays()
         run(["bspc", "rule", "-r", "Launcher"])
         run(["bspc", "rule", "-a", "Launcher", "state=floating", "center=true"])
     }
@@ -131,12 +191,35 @@ ShellRoot {
         persistenceSupported: true
         onNotification: notification => {
             notification.tracked = true
-            root.showNotificationToast(notification)
+            const times = Object.assign({}, root.notificationTimes)
+            times[notification.id] = Date.now()
+            root.notificationTimes = times
+            if (!root.doNotDisturb || notification.urgency === 2)
+                root.showNotificationToast(notification)
+            Qt.callLater(root.pruneNotifications)
         }
+    }
+
+    AudioService {
+        id: audioService
     }
 
     PolkitAgent {
         id: polkitAgent
+    }
+
+    RetainableLock {
+        id: toastNotificationLock
+        object: root.toastRetainedNotification
+        locked: object !== null
+    }
+
+    Connections {
+        target: root.toastRetainedNotification
+        function onClosed() {
+            if (!root.toastClearing)
+                root.finishNotificationToast()
+        }
     }
 
     function updateBspwm(output) {
@@ -146,9 +229,109 @@ ShellRoot {
     }
 
     function showNotificationToast(notification) {
-        toastNotification = notification
+        if (toastNotification) {
+            notificationQueue = notificationQueue.concat([notificationSnapshot(notification, false)])
+            return
+        }
+        toastRetainedNotification = notification
+        toastNotification = notificationSnapshot(notification, true)
+        displayNotificationToast()
+    }
+
+    function notificationSnapshot(notification, includeActions) {
+        return {
+            id: notification.id,
+            appName: notification.appName || "Notification",
+            summary: notification.summary || "",
+            body: notification.body || "",
+            appIcon: notification.appIcon || "",
+            image: notification.image || "",
+            urgency: notification.urgency,
+            receivedAt: notificationTimes[notification.id] || Date.now(),
+            expireTimeout: notification.expireTimeout,
+            actions: includeActions ? notification.actions : []
+        }
+    }
+
+    function showOperationError(title, message) {
+        operationErrorTitle = title
+        operationErrorMessage = message
+    }
+
+    function notificationTime(id) {
+        const timestamp = notificationTimes[id]
+        return timestamp ? Qt.formatDateTime(new Date(timestamp), "HH:mm") : "now"
+    }
+
+    function notificationImage(notification) {
+        if (!notification)
+            return ""
+        if (notification.image && notification.image.length > 0)
+            return notification.image
+        return notification.appIcon && notification.appIcon.length > 0 ? Quickshell.iconPath(notification.appIcon, true) : ""
+    }
+
+    function displayNotificationToast() {
         notificationToast.visible = true
-        notificationToastTimer.restart()
+        if (toastNotification.expireTimeout >= 0)
+            notificationToastTimer.restart()
+        else
+            notificationToastTimer.stop()
+    }
+
+    function clearNotificationToast(reason) {
+        if (toastClearing)
+            return
+        if (toastRetainedNotification && reason === "dismiss") {
+            toastClearing = true
+            toastRetainedNotification.dismiss()
+            toastClearing = false
+            finishNotificationToast()
+            return
+        }
+        if (toastRetainedNotification && reason === "expire") {
+            toastClearing = true
+            toastRetainedNotification.expire()
+            toastClearing = false
+            finishNotificationToast()
+            return
+        }
+        finishNotificationToast()
+    }
+
+    function finishNotificationToast() {
+        notificationToastTimer.stop()
+        notificationToast.visible = false
+        toastRetainedNotification = null
+        toastNotification = null
+        while (notificationQueue.length > 0) {
+            const next = notificationQueue[0]
+            notificationQueue = notificationQueue.slice(1)
+            const notification = notificationServer.trackedNotifications.values.find(item => item.id === next.id)
+            if (notification) {
+                showNotificationToast(notification)
+                break
+            }
+        }
+    }
+
+    function invokeToastAction(action) {
+        if (toastClearing)
+            return
+        toastClearing = true
+        action.invoke()
+        toastClearing = false
+        finishNotificationToast()
+    }
+
+    function pruneNotifications() {
+        const notifications = notificationServer.trackedNotifications.values
+        const times = {}
+        for (const notification of notifications)
+            times[notification.id] = notificationTimes[notification.id] || Date.now()
+        notificationTimes = times
+        if (notifications.length > 100)
+            notifications[0].dismiss()
     }
 
     function updateWorkspaces(output) {
@@ -166,16 +349,9 @@ ShellRoot {
 
     function setActiveWorkspace(name) {
         activeDesktop = name
-        workspaceStates = workspaceStates.map(workspace => ({
-            name: workspace.name,
-            occupied: workspace.occupied,
-            urgent: workspace.urgent,
-            active: workspace.name === name
-        }))
     }
 
     function focusWorkspace(name) {
-        setActiveWorkspace(name)
         run(["bspc", "desktop", "-f", name])
     }
 
@@ -204,13 +380,11 @@ ShellRoot {
         const fields = output.trim().split("\n")
         audioStatus = fields.length > 0 ? fields[0].trim() : ""
         outputMuted = fields.length > 7 && fields[7].trim() === "yes"
-        networkStatus = fields.length > 1 ? fields[1].trim() : ""
         bluetoothStatus = fields.length > 2 ? fields[2].trim() : ""
         if (!volumeAdjusting && fields.length > 3 && !isNaN(Number(fields[3].trim())))
             volumeLevel = Number(fields[3].trim())
         audioDetail = fields.length > 4 ? fields[4].trim() : "Default sink"
         defaultSinkName = fields.length > 4 ? fields[4].trim() : ""
-        networkDetail = fields.length > 5 ? fields[5].trim() : "Disconnected"
         bluetoothDetail = fields.length > 6 ? fields[6].trim() : "No connected devices"
     }
 
@@ -228,6 +402,8 @@ ShellRoot {
         const txBytes = fields.length > 6 ? Number(fields[6]) : 0
         const sampleMs = Date.now()
         const elapsedMs = previousNetworkSampleMs > 0 ? sampleMs - previousNetworkSampleMs : 0
+        networkDownloadMbps = 0
+        networkUploadMbps = 0
         if (elapsedMs > 0 && previousRxBytes >= 0 && rxBytes >= previousRxBytes)
             networkDownloadMbps = (rxBytes - previousRxBytes) * 8 / (elapsedMs * 1000)
         if (elapsedMs > 0 && previousTxBytes >= 0 && txBytes >= previousTxBytes)
@@ -237,6 +413,8 @@ ShellRoot {
         previousNetworkSampleMs = sampleMs
         networkInterface = nextInterface
         networkType = fields.length > 1 ? fields[1] : ""
+        networkDetail = fields.length > 2 && fields[2].length > 0 ? fields[2] : "Disconnected"
+        networkStatus = networkInterface.length > 0 ? "󰀂" : "󰤮"
         networkIp = fields.length > 3 ? fields[3] : ""
         if (networkInterface.length === 0) {
             networkDownloadMbps = 0
@@ -245,16 +423,7 @@ ShellRoot {
     }
 
     function refreshNowPlaying() {
-        const players = Mpris.players.values
-        currentPlayer = null
-        for (let i = 0; i < players.length; i++) {
-            if (players[i] && players[i].isPlaying) {
-                currentPlayer = players[i]
-                return
-            }
-        }
-        if (players.length > 0)
-            currentPlayer = players[0]
+        // MPRIS player state is exposed through reactive bindings.
     }
 
     function formatTrackTime(seconds) {
@@ -285,52 +454,45 @@ ShellRoot {
     }
 
     function saveQuickNote() {
+        if (noteSaving)
+            return
         const title = quickNoteTitle.text.trim() || "Quick note"
         const body = quickNoteBody.text.trim()
         if (title === "Quick note" && body.length === 0)
             return
         const timestamp = Qt.formatDateTime(new Date(), "yyyy-MM-dd ddd HH:mm")
         const content = "* " + title + "\n  :PROPERTIES:\n  :CREATED: [" + timestamp + "]\n  :END:" + (body.length > 0 ? "\n  " + body.replace(/\n/g, "\n  ") : "")
-        run(["sh", "-c", "mkdir -p \"$HOME/org\"; printf '\\n%s\\n' " + shellQuote(content) + " >> \"$HOME/org/inbox.org\"; notify-send 'Org note saved' \"$HOME/org/inbox.org\""])
-        quickNoteTitle.clear()
-        quickNoteBody.clear()
-        quickNotePopup.visible = false
+        pendingNoteContent = content
+        noteSaveError = ""
+        noteSaving = true
+        noteSaveProcess.command = ["sh", "-c", "mkdir -p \"$HOME/org\" && printf '\\n%s\\n' \"$1\" >> \"$HOME/org/inbox.org\"", "quickshell-note", content]
+        noteSaveProcess.running = true
     }
 
     function setVolume(value) {
         pendingVolumeLevel = Math.round(value * 100)
-        volumeLevel = pendingVolumeLevel
-        volumeAdjusting = true
-        volumeApplyTimer.restart()
-        volumeSettleTimer.restart()
+        audioService.setOutputVolume(value)
     }
 
     function setMicVolume(value) {
         pendingMicVolumeLevel = Math.round(value * 100)
-        micVolumeLevel = pendingMicVolumeLevel
-        micVolumeAdjusting = true
-        micVolumeApplyTimer.restart()
-        micVolumeSettleTimer.restart()
+        audioService.setInputVolume(value)
     }
 
     function toggleOutputMute() {
-        run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"])
-        outputMuted = !outputMuted
+        audioService.toggleOutputMute()
     }
 
     function toggleMicMute() {
-        run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "toggle"])
-        micMuted = !micMuted
+        audioService.toggleInputMute()
     }
 
     function applyWallpaper(path) {
-        selectedWallpaper = path
-        run(["feh", "--bg-fill", path])
-    }
-
-    function clearWallpaper() {
-        run(["notify-send", "Wallpaper cleared", "Please set a new wallpaper"])
-        selectedWallpaper = ""
+        if (wallpaperApplyProcess.running)
+            return
+        wallpaperApplyProcess.pendingPath = path
+        wallpaperApplyProcess.command = ["feh", "--bg-fill", path]
+        wallpaperApplyProcess.running = true
     }
 
     function setIconTheme(theme) {
@@ -357,8 +519,11 @@ ShellRoot {
             refreshDisplays()
         else if (page === "Appearance")
             refreshAppearanceSettings()
-        else if (page === "Session")
+        else if (page === "Session") {
             refreshHardwareSettings()
+            if (!metricsQuery.running)
+                metricsQuery.running = true
+        }
     }
 
     function openSettings(page) {
@@ -366,8 +531,6 @@ ShellRoot {
         closePopups()
         selectSettingsPage(page)
         settingsWindow.visible = true
-        settingsWindow.x = centerX(settingsWindow.width)
-        settingsWindow.y = centerY(settingsWindow.height)
         settingsWindow.raise()
         if (!wasVisible)
             settingsWindow.requestActivate()
@@ -387,43 +550,49 @@ ShellRoot {
 
     function openWallpaperViewer() {
         settingsWindow.visible = false
+        closePopups()
         wallpaperViewer.visible = true
         wallpaperViewer.requestActivate()
     }
 
     function applyBspLayout(layout) {
-        bspLayout = layout
-        run(["bsp-layout", "set", layout])
-        layoutPopup.visible = false
-    }
-
-    function setWindowGap(value) {
-        windowGap = Math.round(value)
-        run(["bspc", "config", "window_gap", String(windowGap)])
-        persistBspwmAppearance()
-    }
-
-    function setBorderWidth(value) {
-        borderWidth = Math.round(value)
-        run(["bspc", "config", "border_width", String(borderWidth)])
-        persistBspwmAppearance()
+        if (layoutActionProcess.running)
+            return
+        layoutActionError = ""
+        layoutActionBusy = true
+        layoutActionProcess.pendingLayout = layout
+        layoutActionProcess.command = ["bsp-layout", "set", layout]
+        layoutActionProcess.running = true
     }
 
     function setPanelHeight(value) {
         panelHeight = Math.round(value)
-        run(["bspc", "config", "top_padding", String(panelHeight)])
+        run(["bspc", "config", "top_padding", String(effectivePanelHeight)])
+        interfacePersistTimer.restart()
     }
 
     function setMenuFontScale(value) {
-        menuFontScale = value
+        menuFontScale = Math.max(0.75, Math.min(2.5, value))
+        interfacePersistTimer.restart()
     }
 
-    function toggleCompositor(enabled) {
-        compositorEnabled = enabled
-        if (enabled)
-            run(["sh", "-c", "pkill -x picom 2>/dev/null || true; exec picom --config \"$HOME/.config/picom/picom.conf\" --vsync"])
-        else
-            run(["pkill", "-x", "picom"])
+    function setMenuScale(value) {
+        menuScale = Math.max(0.75, Math.min(2.5, value))
+        run(["bspc", "config", "top_padding", String(effectivePanelHeight)])
+        interfacePersistTimer.restart()
+    }
+
+    function applyInterfacePreset(scale) {
+        menuScale = scale
+        menuFontScale = Math.max(0.75, Math.min(2.5, 1.2 * scale))
+        panelHeight = 32
+        run(["bspc", "config", "top_padding", String(effectivePanelHeight)])
+        interfacePersistTimer.restart()
+    }
+
+    function setReducedMotion(enabled) {
+        reducedMotion = enabled
+        interfacePersistTimer.restart()
     }
 
     function setBrightness(value) {
@@ -437,6 +606,7 @@ ShellRoot {
         keyboardRepeatDelay = Math.round(delay)
         keyboardRepeatRate = Math.round(rate)
         run(["xset", "r", "rate", String(delay), String(rate)])
+        hardwarePersistTimer.restart()
     }
 
     function toggleTouchpad(enabled) {
@@ -444,6 +614,7 @@ ShellRoot {
             return
         touchpadEnabled = enabled
         run(["sh", "-c", "command -v xinput >/dev/null && xinput list --id-only '.*[Tt]ouchpad.*' | xargs -r -n1 xinput --set-prop {} 'Device Enabled' " + (enabled ? "1" : "0")])
+        hardwarePersistTimer.restart()
     }
 
     function updateHardwareSettings(output) {
@@ -487,10 +658,6 @@ ShellRoot {
             gtkThemesQuery.running = true
     }
 
-    function persistBspwmAppearance() {
-        appearancePersistTimer.restart()
-    }
-
     function layoutIcon(layout) {
         return layout === "tall" ? "▮▯" : layout === "monocle" ? "▣" : "⊞"
     }
@@ -505,21 +672,62 @@ ShellRoot {
 
     function centerX(width) {
         const screen = primaryScreen()
-        return screen ? screen.x + (screen.width - width) / 2 : (Screen.width - width) / 2
+        return screen ? screen.x + Math.max(0, (screen.width - width) / 2) : Math.max(0, (Screen.width - width) / 2)
     }
 
     function centerY(height) {
         const screen = primaryScreen()
-        return screen ? screen.y + (screen.height - height) / 2 : (Screen.height - height) / 2
+        return screen ? screen.y + Math.max(0, (screen.height - height) / 2) : Math.max(0, (Screen.height - height) / 2)
     }
 
-    function connectBluetooth(address) {
-        run(["bluetoothctl", "connect", address])
-        refreshBluetoothDevices()
+    function runBluetoothAction(command) {
+        if (bluetoothActionProcess.running)
+            return
+        bluetoothActionError = ""
+        bluetoothActionBusy = true
+        bluetoothActionProcess.command = command
+        bluetoothActionProcess.running = true
     }
 
-    function connectNetwork(ssid) {
-        run(["nmcli", "device", "wifi", "connect", ssid])
+    function connectBluetooth(address, connected, paired) {
+        if (connected) {
+            runBluetoothAction(["bluetoothctl", "disconnect", address])
+        } else if (paired) {
+            runBluetoothAction(["bluetoothctl", "connect", address])
+        } else {
+            runBluetoothAction(["sh", "-c", "bluetoothctl pair \"$1\" && bluetoothctl trust \"$1\" && bluetoothctl connect \"$1\"", "quickshell-bluetooth", address])
+        }
+    }
+
+    function setBluetoothEnabled(enabled) {
+        runBluetoothAction(["bluetoothctl", "power", enabled ? "on" : "off"])
+    }
+
+    function runNetworkAction(command) {
+        if (networkActionProcess.running)
+            return
+        networkActionError = ""
+        networkActionBusy = true
+        networkActionProcess.command = command
+        networkActionProcess.running = true
+    }
+
+    function connectNetwork(ssid, security, active, profileUuid) {
+        if (active || networkActionBusy)
+            return
+        if (profileUuid && profileUuid.length > 0) {
+            runNetworkAction(["nmcli", "connection", "up", "uuid", profileUuid])
+            return
+        }
+        if (security && security !== "Open" && security !== "--") {
+            wifiPasswordDialog.openForNetwork(ssid)
+            return
+        }
+        runNetworkAction(["nmcli", "device", "wifi", "connect", ssid])
+    }
+
+    function connectNetworkWithPassword(ssid, password) {
+        runNetworkAction(["nmcli", "device", "wifi", "connect", ssid, "password", password])
     }
 
     function updateWifiState(output) {
@@ -530,9 +738,7 @@ ShellRoot {
     }
 
     function setWifiEnabled(enabled) {
-        wifiEnabled = enabled
-        run(["nmcli", "radio", "wifi", enabled ? "on" : "off"])
-        wifiRefreshTimer.restart()
+        runNetworkAction(["nmcli", "radio", "wifi", enabled ? "on" : "off"])
     }
 
     function updateVpnProfiles(output) {
@@ -547,13 +753,11 @@ ShellRoot {
     }
 
     function toggleVpnProfile(name, active) {
-        run(["nmcli", "connection", active ? "down" : "up", name])
-        vpnRefreshTimer.restart()
+        runNetworkAction(["nmcli", "connection", active ? "down" : "up", name])
     }
 
     function setTailscaleEnabled(enabled) {
-        run(["tailscale", enabled ? "up" : "down"])
-        vpnRefreshTimer.restart()
+        runNetworkAction(["tailscale", enabled ? "up" : "down"])
     }
 
     function refreshVpnSettings() {
@@ -576,16 +780,20 @@ ShellRoot {
                 continue
             let display = result.find(item => item.name === fields[0])
             if (!display) {
-                display = { name: fields[0], state: fields[1], primary: fields[2] === "primary", mode: fields[3], refresh: fields[4], modes: [] }
+                const geometry = fields.length > 6 ? fields[6] : ""
+                const position = geometry.match(/^[0-9]+x[0-9]+([+-][0-9]+)([+-][0-9]+)$/)
+                display = { name: fields[0], state: fields[1], active: false, primary: fields[2] === "primary", mode: "", refresh: "", x: position ? Number(position[1]) : 0, y: position ? Number(position[2]) : 0, rotation: fields.length > 7 ? fields[7] : "normal", modes: [] }
                 result.push(display)
             }
             const option = { label: fields[3] + "  @  " + fields[4] + " Hz", mode: fields[3], refresh: fields[4], selected: fields[5] === "selected" }
             display.modes.push(option)
             if (option.selected) {
+                display.active = true
                 display.mode = option.mode
                 display.refresh = option.refresh
             }
         }
+        primaryDisplayName = ""
         displays = result
         for (const display of result) {
             if (display.primary) {
@@ -601,25 +809,24 @@ ShellRoot {
     }
 
     function setPrimaryDisplay(name) {
-        run(["xrandr", "--output", name, "--primary"])
-        for (const display of displays)
-            display.primary = display.name === name
-        persistDisplayLayout()
-        refreshDisplays()
+        if (displayActionBusy || !displays.some(display => display.name === name))
+            return
+        displayActionError = ""
+        displayRollbackScript = buildDisplayScript()
+        displayActionBusy = true
+        displayActionProcess.command = ["xrandr", "--output", name, "--primary"]
+        displayActionProcess.running = true
     }
 
     function setDisplayMode(name, mode, refresh) {
-        for (const display of displays) {
-            if (display.name === name) {
-                display.mode = mode
-                display.refresh = refresh
-                for (const option of display.modes)
-                    option.selected = option.mode === mode && option.refresh === refresh
-            }
-        }
-        run(["xrandr", "--output", name, "--mode", mode, "--rate", refresh])
-        persistDisplayLayout()
-        refreshDisplays()
+        const display = displays.find(item => item.name === name)
+        if (displayActionBusy || !display || !display.modes.some(option => option.mode === mode && option.refresh === refresh))
+            return
+        displayActionError = ""
+        displayRollbackScript = buildDisplayScript()
+        displayActionBusy = true
+        displayActionProcess.command = ["xrandr", "--output", name, "--mode", mode, "--rate", refresh]
+        displayActionProcess.running = true
     }
 
     function shellQuote(value) {
@@ -627,16 +834,44 @@ ShellRoot {
     }
 
     function persistDisplayLayout() {
-        const commands = ["#!/usr/bin/env sh"]
+        const script = buildDisplayScript()
+        run(["sh", "-c", "target=\"${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/display-layout.sh\"; mkdir -p \"$(dirname \"$target\")\"; temporary=\"$target.tmp.$$\"; printf '%s' \"$1\" > \"$temporary\" && chmod +x \"$temporary\" && mv -f \"$temporary\" \"$target\"", "quickshell-display", script])
+    }
+
+    function buildDisplayScript() {
+        const commands = ["#!/usr/bin/env sh", "set -eu"]
+        let layoutCommand = "xrandr"
         for (const display of displays) {
             if (display.state !== "connected")
                 continue
-            commands.push("xrandr --output " + shellQuote(display.name) + " --mode " + shellQuote(display.mode) + " --rate " + shellQuote(display.refresh))
+            if (!display.active || display.mode.length === 0) {
+                layoutCommand += " --output " + shellQuote(display.name) + " --off"
+                continue
+            }
+            layoutCommand += " --output " + shellQuote(display.name) + " --mode " + shellQuote(display.mode) + " --rate " + shellQuote(display.refresh) + " --pos " + shellQuote(display.x + "x" + display.y) + " --rotate " + shellQuote(display.rotation || "normal")
             if (display.primary)
-                commands.push("xrandr --output " + shellQuote(display.name) + " --primary")
+                layoutCommand += " --primary"
         }
-        const script = commands.join("\n") + "\n"
-        run(["sh", "-c", "target=\"$HOME/nux/hosts/${NUX_HOST:-generic}/displays.sh\"; mkdir -p \"$(dirname \"$target\")\"; printf '%s' " + shellQuote(script) + " > \"$target\"; chmod +x \"$target\""])
+        commands.push(layoutCommand)
+        return commands.join("\n") + "\n"
+    }
+
+    function keepDisplayLayout() {
+        if (displayQuery.running || displayRefreshPending)
+            return
+        displayRollbackTimer.stop()
+        displayConfirmation.visible = false
+        displayRollbackScript = ""
+        persistDisplayLayout()
+    }
+
+    function revertDisplayLayout() {
+        displayRollbackTimer.stop()
+        displayConfirmation.visible = false
+        if (displayRollbackScript.length === 0)
+            return
+        displayRollbackProcess.command = ["sh", "-c", "$1", "quickshell-display-rollback", displayRollbackScript]
+        displayRollbackProcess.running = true
     }
 
     function updateMicStatus(output) {
@@ -683,38 +918,105 @@ ShellRoot {
 
     function updateBluetoothDevices(output) {
         const devices = []
-        for (const line of output.trim().split("\n")) {
+        const lines = output.trim().split("\n")
+        if (lines.length > 0 && lines[0].startsWith("@adapter\t")) {
+            const adapter = lines.shift().split("\t")
+            bluetoothAvailable = adapter.length > 1 && adapter[1] === "available"
+            bluetoothEnabled = adapter.length > 2 && adapter[2] === "yes"
+        }
+        for (const line of lines) {
             const fields = line.split("\t")
             if (fields.length >= 2 && fields[0].length > 0)
-                devices.push({ address: fields[0], name: fields.slice(1).join("\t") })
+                devices.push({
+                    address: fields[0],
+                    name: fields[1],
+                    connected: fields.length > 2 && fields[2] === "yes",
+                    paired: fields.length > 3 && fields[3] === "yes",
+                    trusted: fields.length > 4 && fields[4] === "yes",
+                    icon: fields.length > 5 ? fields[5] : "",
+                    battery: fields.length > 6 && !isNaN(Number(fields[6])) ? Number(fields[6]) : -1
+                })
         }
         bluetoothDevices = devices
+        const connectedNames = devices.filter(device => device.connected).map(device => device.name)
+        bluetoothDetail = connectedNames.length > 0 ? connectedNames.join(", ") : "No connected devices"
+        bluetoothStatus = bluetoothAvailable && bluetoothEnabled ? "󰂯" : "󰂲"
     }
 
     function updateNetworkDevices(output) {
-        const devices = []
+        const bySsid = {}
         for (const line of output.trim().split("\n")) {
-            const fields = line.split(":")
+            const fields = splitNmcliFields(line)
             if (fields.length < 4)
                 continue
             const active = fields.shift() === "*"
             const security = fields.pop() || "Open"
             const signal = fields.pop()
-            const ssid = fields.join(":").replace(/\\:/g, ":")
-            if (ssid.length > 0)
-                devices.push({ active: active, ssid: ssid, signal: signal, security: security })
+            const ssid = fields.join(":")
+            const strength = Number(signal)
+            if (ssid.length > 0 && !isNaN(strength)) {
+                const profile = wifiProfiles[ssid]
+                const item = { active: active, ssid: ssid, signal: strength, security: security, profileUuid: profile ? profile.uuid : "", profileName: profile ? profile.name : "" }
+                if (!bySsid[ssid] || active || strength > bySsid[ssid].signal)
+                    bySsid[ssid] = item
+            }
         }
-        networkDevices = devices
+        networkDevices = Object.keys(bySsid).map(key => bySsid[key]).sort((left, right) => Number(right.active) - Number(left.active) || right.signal - left.signal)
+    }
+
+    function updateWifiProfiles(output) {
+        const profiles = {}
+        for (const line of output.trim().split("\n")) {
+            const fields = line.split("\t")
+            if (fields.length >= 3 && fields[0].length > 0 && fields[2].length > 0)
+                profiles[fields[2]] = { uuid: fields[0], name: fields[1] || fields[2] }
+        }
+        wifiProfiles = profiles
+        networkDevices = networkDevices.map(device => {
+            const profile = profiles[device.ssid]
+            return Object.assign({}, device, { profileUuid: profile ? profile.uuid : "", profileName: profile ? profile.name : "" })
+        })
+    }
+
+    function splitNmcliFields(line) {
+        const fields = []
+        let field = ""
+        let escaped = false
+        for (const character of line) {
+            if (escaped) {
+                field += character
+                escaped = false
+            } else if (character === "\\") {
+                escaped = true
+            } else if (character === ":") {
+                fields.push(field)
+                field = ""
+            } else {
+                field += character
+            }
+        }
+        if (escaped)
+            field += "\\"
+        fields.push(field)
+        return fields
     }
 
     function setDefaultSink(name) {
-        run(["pactl", "set-default-sink", name])
-        defaultSinkName = name
+        if (audioActionProcess.running)
+            return
+        audioActionBusy = true
+        audioActionError = ""
+        audioActionProcess.command = ["pactl", "set-default-sink", name]
+        audioActionProcess.running = true
     }
 
     function setDefaultSource(name) {
-        run(["pactl", "set-default-source", name])
-        defaultSourceName = name
+        if (audioActionProcess.running)
+            return
+        audioActionBusy = true
+        audioActionError = ""
+        audioActionProcess.command = ["pactl", "set-default-source", name]
+        audioActionProcess.running = true
     }
 
     function refreshAudioDevices() {
@@ -734,12 +1036,17 @@ ShellRoot {
             bluetoothDevicesQuery.running = true
     }
 
+    function refreshBluetoothSnapshot() {
+        if (!bluetoothSnapshotQuery.running)
+            bluetoothSnapshotQuery.running = true
+    }
+
     function scanNetworks() {
         networkScanning = true
+        if (!wifiProfilesQuery.running)
+            wifiProfilesQuery.running = true
         if (!wifiStateQuery.running)
             wifiStateQuery.running = true
-        if (!networkDevicesQuery.running)
-            networkDevicesQuery.running = true
         refreshVpnSettings()
     }
 
@@ -772,6 +1079,8 @@ ShellRoot {
         const shouldOpen = !popup.visible
         closePopups()
         popup.visible = shouldOpen
+        if (shouldOpen && popup === calendarPopup && !agendaQuery.running)
+            agendaQuery.running = true
         if (shouldOpen && popup === exitNodePopup)
             refreshExitSuggestion()
     }
@@ -792,6 +1101,30 @@ ShellRoot {
         if (activeWindowId.length > 0 && id !== activeWindowId)
             closePopups()
         activeWindowId = id
+    }
+
+    function startActiveWindowQuery() {
+        if (activeWindowQuery.running || pendingActiveWindowId.length === 0)
+            return
+        activeWindowQuery.queryId = pendingActiveWindowId
+        activeWindowQuery.command = ["sh", "-c", "printf '%s\\n' \"$1\"; xprop -id \"$1\" _NET_WM_PID 2>/dev/null | awk '{print $3}'", "quickshell-window", activeWindowQuery.queryId]
+        activeWindowQuery.running = true
+    }
+
+    function activatePowerAction(index) {
+        const action = powerActions[index]
+        powerIndex = index
+        if (!action.command) {
+            closePopups()
+            return
+        }
+        if (pendingPowerIndex !== index) {
+            pendingPowerIndex = index
+            return
+        }
+        pendingPowerIndex = -1
+        closePopups()
+        run(action.command)
     }
 
     function updateTailscale(output) {
@@ -835,11 +1168,10 @@ ShellRoot {
 
     function selectExitNode(address) {
         const returnToPopup = exitNodePopup.visible
-        run(["tailscale", "set", "--exit-node", address])
+        runNetworkAction(["tailscale", "set", "--exit-node", address])
         exitNodePopup.visible = false
         if (returnToPopup)
             networkPopup.visible = true
-        vpnRefreshTimer.restart()
     }
 
     function refreshExitSuggestion() {
@@ -872,15 +1204,14 @@ ShellRoot {
 
     function clearExitNode() {
         const returnToPopup = exitNodePopup.visible
-        run(["tailscale", "set", "--exit-node", ""])
+        runNetworkAction(["tailscale", "set", "--exit-node", ""])
         exitNodePopup.visible = false
         if (returnToPopup)
             networkPopup.visible = true
-        vpnRefreshTimer.restart()
     }
 
     function calendarMonthName() {
-        return ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][calendarMonth]
+        return new Date(calendarYear, calendarMonth, 1).toLocaleString(Qt.locale(), "MMMM")
     }
 
     function calendarDaysInMonth() {
@@ -888,7 +1219,22 @@ ShellRoot {
     }
 
     function calendarFirstWeekday() {
-        return new Date(calendarYear, calendarMonth, 1).getDay()
+        const localeStart = Number(Qt.locale().firstDayOfWeek) % 7
+        return (new Date(calendarYear, calendarMonth, 1).getDay() - localeStart + 7) % 7
+    }
+
+    function calendarWeekdayNames() {
+        const names = []
+        const localeStart = Number(Qt.locale().firstDayOfWeek) % 7
+        for (let index = 0; index < 7; index++)
+            names.push(new Date(1970, 0, 4 + localeStart + index).toLocaleString(Qt.locale(), "ddd"))
+        return names
+    }
+
+    function resetCalendar() {
+        const today = new Date()
+        calendarYear = today.getFullYear()
+        calendarMonth = today.getMonth()
     }
 
     function changeCalendarMonth(amount) {
@@ -903,75 +1249,258 @@ ShellRoot {
         screenshotPopup.visible = false
     }
 
+    function updateAgenda(output) {
+        try {
+            const data = JSON.parse(output)
+            agendaConfigured = data.configured === true
+            agendaError = data.error || ""
+            agendaEvents = Array.isArray(data.events) ? data.events : []
+        } catch (error) {
+            agendaError = "Unable to load agenda"
+            agendaEvents = []
+        }
+    }
+
+    function updatePrivacyStatus(output) {
+        try {
+            const data = JSON.parse(output)
+            microphoneActive = data.microphoneActive === true
+            recordingActive = data.recordingProcess === true
+            screenShareActive = data.screenShareActive === true
+        } catch (error) {
+            microphoneActive = false
+            recordingActive = false
+            screenShareActive = false
+        }
+    }
+
+    function updateSystemMetrics(output) {
+        try {
+            const data = JSON.parse(output)
+            cpuPercent = data.cpuPercent === null ? -1 : Number(data.cpuPercent)
+            memoryPercent = data.memoryPercent === null ? -1 : Number(data.memoryPercent)
+            temperatureC = data.temperatureC === null ? -1 : Number(data.temperatureC)
+            gpuPercent = data.gpuPercent === null ? -1 : Number(data.gpuPercent)
+            powerProfile = data.powerProfile || "unknown"
+        } catch (error) {
+            cpuPercent = memoryPercent = temperatureC = gpuPercent = -1
+            powerProfile = "unknown"
+        }
+    }
+
     Timer {
-        id: appearancePersistTimer
-        interval: 180
+        id: interfacePersistTimer
+        interval: 250
+        repeat: false
+        onTriggered: root.run(["sh", "-c", "directory=\"${XDG_STATE_HOME:-$HOME/.local/state}/quickshell\"; mkdir -p \"$directory\"; temporary=\"$directory/interface-state.tmp.$$\"; printf '%s\\n%s\\n%s\\n%s\\n' \"$1\" \"$2\" \"$3\" \"$4\" > \"$temporary\" && mv -f \"$temporary\" \"$directory/interface-state\"", "quickshell-interface", String(root.panelHeight), String(root.menuFontScale), root.reducedMotion ? "1" : "0", String(root.menuScale)])
+    }
+
+    Timer {
+        id: hardwarePersistTimer
+        interval: 250
         repeat: false
         onTriggered: {
-            const script = "#!/usr/bin/env sh\nbspc config window_gap " + root.windowGap + "\nbspc config border_width " + root.borderWidth + "\n"
-            root.run(["sh", "-c", "mkdir -p \"$HOME/.config/bspwm\"; printf '%s' " + root.shellQuote(script) + " > \"$HOME/.config/bspwm/appearance.sh\"; chmod +x \"$HOME/.config/bspwm/appearance.sh\""])
+            const script = "#!/usr/bin/env sh\nset -eu\nxset r rate " + root.keyboardRepeatDelay + " " + root.keyboardRepeatRate + "\nif command -v xinput >/dev/null 2>&1; then xinput list --id-only '.*[Tt]ouchpad.*' | xargs -r -n1 xinput --set-prop {} 'Device Enabled' " + (root.touchpadEnabled ? "1" : "0") + "\nfi\n"
+            root.run(["sh", "-c", "target=\"${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/hardware-state.sh\"; mkdir -p \"$(dirname \"$target\")\"; temporary=\"$target.tmp.$$\"; printf '%s' \"$1\" > \"$temporary\" && chmod +x \"$temporary\" && mv -f \"$temporary\" \"$target\"", "quickshell-hardware", script])
         }
     }
 
-    Timer {
-        id: volumeApplyTimer
-        interval: 60
-        repeat: false
-        onTriggered: root.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", Math.round(root.pendingVolumeLevel) + "%"])
-    }
-
-    Timer {
-        id: volumeSettleTimer
-        interval: 400
-        repeat: false
-        onTriggered: root.volumeAdjusting = false
-    }
-
-    Timer {
-        id: micVolumeApplyTimer
-        interval: 60
-        repeat: false
-        onTriggered: root.run(["pactl", "set-source-volume", "@DEFAULT_SOURCE@", Math.round(root.pendingMicVolumeLevel) + "%"])
-    }
-
-    Timer {
-        id: micVolumeSettleTimer
-        interval: 400
-        repeat: false
-        onTriggered: root.micVolumeAdjusting = false
-    }
-
     Process {
-        id: bspwmQuery
-        command: ["bspc", "query", "-D", "-d", "--names"]
+        command: ["sh", "-c", "state=\"${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/interface-state\"; [ -r \"$state\" ] && cat \"$state\""]
         running: true
         stdout: StdioCollector {
-            id: bspwmOutput
-            onStreamFinished: root.updateBspwm(bspwmOutput.text)
+            id: interfaceStateOutput
+            onStreamFinished: {
+                const values = interfaceStateOutput.text.trim().split("\n")
+                if (values.length > 1 && !isNaN(Number(values[1])))
+                    root.menuFontScale = Math.max(0.75, Math.min(2.5, Number(values[1])))
+                if (values.length > 2)
+                    root.reducedMotion = values[2] === "1"
+                if (values.length > 3 && !isNaN(Number(values[3])))
+                    root.menuScale = Math.max(0.75, Math.min(2.5, Number(values[3])))
+                root.run(["bspc", "config", "top_padding", String(root.effectivePanelHeight)])
+            }
+        }
+    }
+
+    Connections {
+        target: WmState
+        function onActiveWindowIdChanged() {
+            if (WmState.activeWindowId.length === 0)
+                return
+            root.pendingActiveWindowId = WmState.activeWindowId
+            root.startActiveWindowQuery()
         }
     }
 
     Process {
-        id: bspwmDesktopEvents
-        command: ["sh", "-c", "bspc subscribe desktop_focus | while IFS= read -r event; do bspc query -D -d --names; done"]
-        running: true
-        stdout: SplitParser {
-            onRead: data => {
-                const name = data.trim()
-                if (name.length > 0)
-                    root.setActiveWorkspace(name)
+        id: noteSaveProcess
+        stderr: StdioCollector { id: noteSaveErrorOutput }
+        onExited: (exitCode, exitStatus) => {
+            root.noteSaving = false
+            if (exitCode === 0) {
+                quickNoteTitle.clear()
+                quickNoteBody.clear()
+                quickNotePopup.visible = false
+                root.run(["notify-send", "Org note saved", "~/org/inbox.org"])
+            } else {
+                root.noteSaveError = noteSaveErrorOutput.text.trim() || "Unable to save the note"
             }
         }
     }
 
     Process {
-        id: workspaceQuery
-        command: ["sh", "-c", "printf '%s\\n---\\n%s\\n---\\n%s\\n' \"$(bspc query -D --names 2>/dev/null)\" \"$(bspc query -D .occupied --names 2>/dev/null)\" \"$(bspc query -D .urgent --names 2>/dev/null)\""]
+        id: layoutActionProcess
+        property string pendingLayout: ""
+        stderr: StdioCollector { id: layoutActionErrorOutput }
+        onExited: (exitCode, exitStatus) => {
+            root.layoutActionBusy = false
+            if (exitCode === 0) {
+                root.bspLayout = pendingLayout
+                root.layoutActionError = ""
+                layoutPopup.visible = false
+            } else {
+                root.layoutActionError = layoutActionErrorOutput.text.trim() || "Unable to change layout"
+            }
+        }
+    }
+
+    Process {
+        id: audioActionProcess
+        stderr: StdioCollector { id: audioActionErrorOutput }
+        onExited: (exitCode, exitStatus) => {
+            root.audioActionBusy = false
+            if (exitCode === 0) {
+                root.audioActionError = ""
+                if (!audioDefaultsQuery.running)
+                    audioDefaultsQuery.running = true
+                root.refreshAudioDevices()
+            } else {
+                root.audioActionError = audioActionErrorOutput.text.trim() || "Audio operation failed"
+            }
+        }
+    }
+
+    Process {
+        id: wallpaperApplyProcess
+        property string pendingPath: ""
+        stderr: StdioCollector { id: wallpaperApplyError }
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0) {
+                root.selectedWallpaper = pendingPath
+                root.run(["notify-send", "Wallpaper applied", pendingPath.split("/").pop()])
+            } else {
+                root.run(["notify-send", "Wallpaper failed", wallpaperApplyError.text.trim() || "Unable to apply wallpaper"])
+            }
+        }
+    }
+
+    Process {
+        id: agendaQuery
+        command: [root.configDirectory + "/scripts/agenda.py"]
+        stdout: StdioCollector {
+            id: agendaOutput
+            onStreamFinished: root.updateAgenda(agendaOutput.text)
+        }
+    }
+
+    Process {
+        id: privacyQuery
+        command: [root.configDirectory + "/scripts/privacy-status.sh"]
         running: true
         stdout: StdioCollector {
-            id: workspaceOutput
-            onStreamFinished: root.updateWorkspaces(workspaceOutput.text)
+            id: privacyOutput
+            onStreamFinished: root.updatePrivacyStatus(privacyOutput.text)
         }
+    }
+
+    Process {
+        id: metricsQuery
+        command: [root.configDirectory + "/scripts/system-metrics.sh"]
+        stdout: StdioCollector {
+            id: metricsOutput
+            onStreamFinished: root.updateSystemMetrics(metricsOutput.text)
+        }
+    }
+
+    Timer {
+        interval: 3000
+        repeat: true
+        running: true
+        onTriggered: {
+            if (!privacyQuery.running)
+                privacyQuery.running = true
+            if (settingsWindow.visible && root.settingsPage === "Session" && !metricsQuery.running)
+                metricsQuery.running = true
+        }
+    }
+
+    Process {
+        id: networkActionProcess
+        stderr: StdioCollector { id: networkActionErrorOutput }
+        onExited: (exitCode, exitStatus) => {
+            root.networkActionBusy = false
+            if (exitCode === 0) {
+                root.networkActionError = ""
+                wifiRefreshTimer.restart()
+                vpnRefreshTimer.restart()
+            } else {
+                root.networkActionError = networkActionErrorOutput.text.trim() || "Network operation failed"
+            }
+        }
+    }
+
+    Process {
+        id: bluetoothActionProcess
+        stderr: StdioCollector { id: bluetoothActionErrorOutput }
+        onExited: (exitCode, exitStatus) => {
+            root.bluetoothActionBusy = false
+            if (exitCode === 0) {
+                root.bluetoothActionError = ""
+                root.refreshBluetoothDevices()
+            } else {
+                root.bluetoothActionError = bluetoothActionErrorOutput.text.trim() || "Bluetooth operation failed"
+            }
+        }
+    }
+
+    Process {
+        id: displayActionProcess
+        stderr: StdioCollector { id: displayActionErrorOutput }
+        onExited: (exitCode, exitStatus) => {
+            root.displayActionBusy = false
+            if (exitCode === 0) {
+                root.displayActionError = ""
+                root.displayRefreshPending = true
+                if (displayQuery.running)
+                    root.displayRefreshAfterCurrent = true
+                else
+                    root.refreshDisplays()
+                displayConfirmation.visible = true
+                displayConfirmation.requestActivate()
+                displayRollbackTimer.restart()
+            } else {
+                root.displayActionError = displayActionErrorOutput.text.trim() || "Display operation failed"
+            }
+        }
+    }
+
+    Process {
+        id: displayRollbackProcess
+        stderr: StdioCollector { id: displayRollbackError }
+        onExited: (exitCode, exitStatus) => {
+            root.displayRollbackScript = ""
+            if (exitCode !== 0)
+                root.displayActionError = displayRollbackError.text.trim() || "Unable to restore the previous display layout"
+            root.refreshDisplays()
+        }
+    }
+
+    Timer {
+        id: displayRollbackTimer
+        interval: 15000
+        repeat: false
+        onTriggered: root.revertDisplayLayout()
     }
 
     Process {
@@ -981,36 +1510,6 @@ ShellRoot {
         stdout: StdioCollector {
             id: batteryOutput
             onStreamFinished: root.updateBattery(batteryOutput.text)
-        }
-    }
-
-    Process {
-        id: windowTitleQuery
-        command: ["sh", "-c", "id=$(xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | awk '{print $5}'); title=; if [ -n \"$id\" ] && [ \"$id\" != \"0x0\" ]; then title=$(xprop -id \"$id\" _NET_WM_NAME 2>/dev/null | cut -d '\"' -f2); [ -z \"$title\" ] && title=$(xprop -id \"$id\" WM_NAME 2>/dev/null | cut -d '\"' -f2); fi; printf '%s\\n' \"$title\""]
-        running: true
-        stdout: StdioCollector {
-            id: windowTitleOutput
-            onStreamFinished: root.updateActiveTitle(windowTitleOutput.text)
-        }
-    }
-
-    Process {
-        id: statusQuery
-        command: ["sh", "-c", "volume=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | awk 'NR==1 {gsub(/%/,\"\",$5); print $5}'); mute=$(pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null | awk '{print $2}'); [ \"$mute\" = yes ] && audio='󰝟' || audio='󰕾'; sink=$(pactl get-default-sink 2>/dev/null); [ -z \"$sink\" ] && sink='Default sink'; network=$(nmcli -t -f GENERAL.STATE device show 2>/dev/null | head -n1 | cut -d: -f2-); connection=$(nmcli -t -f GENERAL.CONNECTION device show 2>/dev/null | sed -n 's/^GENERAL.CONNECTION://p' | head -n1); [ -z \"$connection\" ] && connection='Disconnected'; case \"$network\" in 100*) network='󰀂';; *) network='󰤮';; esac; powered=$(bluetoothctl show 2>/dev/null | awk '/Powered:/ {print $2}'); devices=$(bluetoothctl devices Connected 2>/dev/null | sed 's/^Device [^ ]* //' | paste -sd ', ' -); [ -z \"$devices\" ] && devices='No connected devices'; [ \"$powered\" = yes ] && bluetooth='󰂯' || bluetooth='󰂲'; printf '%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n' \"$audio\" \"$network\" \"$bluetooth\" \"$volume\" \"$sink\" \"$connection\" \"$devices\" \"$mute\""]
-        running: true
-        stdout: StdioCollector {
-            id: statusCollector
-            onStreamFinished: root.updateStatus(statusCollector.text)
-        }
-    }
-
-    Process {
-        id: micStatusQuery
-        command: ["sh", "-c", "volume=$(pactl get-source-volume @DEFAULT_SOURCE@ 2>/dev/null | awk 'NR==1 {gsub(/%/,\"\",$5); print $5}'); mute=$(pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null | awk '{print $2}'); name=$(pactl get-default-source 2>/dev/null); printf '%s\\n%s\\n%s\\n' \"${volume:-0}\" \"${mute:-no}\" \"${name:-Default microphone}\""]
-        running: true
-        stdout: StdioCollector {
-            id: micStatusOutput
-            onStreamFinished: root.updateMicStatus(micStatusOutput.text)
         }
     }
 
@@ -1043,13 +1542,63 @@ ShellRoot {
     }
 
     Process {
+        id: audioDefaultsQuery
+        command: ["sh", "-c", "pactl get-default-sink 2>/dev/null; pactl get-default-source 2>/dev/null"]
+        running: true
+        stdout: StdioCollector {
+            id: audioDefaultsOutput
+            onStreamFinished: {
+                const fields = audioDefaultsOutput.text.trim().split("\n")
+                root.defaultSinkName = fields.length > 0 ? fields[0] : ""
+                root.defaultSourceName = fields.length > 1 ? fields[1] : ""
+                root.audioDetail = root.defaultSinkName || "Default sink"
+                root.micName = root.defaultSourceName || "Default microphone"
+            }
+        }
+    }
+
+    Process {
         id: bluetoothDevicesQuery
-        command: ["sh", "-c", "bluetoothctl --timeout 8 scan on >/dev/null 2>&1; bluetoothctl devices 2>/dev/null | while read -r _ address name; do printf '%s\\t%s\\n' \"$address\" \"$name\"; done"]
+        command: ["sh", "-c", "controller=$(bluetoothctl show 2>/dev/null); if [ -n \"$controller\" ]; then available=available; powered=$(printf '%s\\n' \"$controller\" | awk '/Powered:/ {print $2; exit}'); else available=unavailable; powered=no; fi; printf '@adapter\\t%s\\t%s\\n' \"$available\" \"$powered\"; [ \"$powered\" = yes ] && bluetoothctl --timeout 8 scan on >/dev/null 2>&1; bluetoothctl devices 2>/dev/null | while read -r _ address name; do info=$(bluetoothctl info \"$address\" 2>/dev/null); connected=$(printf '%s\\n' \"$info\" | awk '/Connected:/ {print $2; exit}'); paired=$(printf '%s\\n' \"$info\" | awk '/Paired:/ {print $2; exit}'); trusted=$(printf '%s\\n' \"$info\" | awk '/Trusted:/ {print $2; exit}'); icon=$(printf '%s\\n' \"$info\" | awk '/Icon:/ {print $2; exit}'); battery=$(printf '%s\\n' \"$info\" | awk '/Battery Percentage:/ {value=$NF; gsub(/[()]/, \"\", value); print value; exit}'); printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$address\" \"$name\" \"${connected:-no}\" \"${paired:-no}\" \"${trusted:-no}\" \"$icon\" \"${battery:--1}\"; done"]
         stdout: StdioCollector {
             id: bluetoothDevicesOutput
             onStreamFinished: root.updateBluetoothDevices(bluetoothDevicesOutput.text)
         }
         onExited: root.bluetoothScanning = false
+    }
+
+    Process {
+        id: bluetoothSnapshotQuery
+        command: ["sh", "-c", "controller=$(bluetoothctl show 2>/dev/null); if [ -n \"$controller\" ]; then available=available; powered=$(printf '%s\\n' \"$controller\" | awk '/Powered:/ {print $2; exit}'); else available=unavailable; powered=no; fi; printf '@adapter\\t%s\\t%s\\n' \"$available\" \"$powered\"; bluetoothctl devices 2>/dev/null | while read -r _ address name; do info=$(bluetoothctl info \"$address\" 2>/dev/null); connected=$(printf '%s\\n' \"$info\" | awk '/Connected:/ {print $2; exit}'); paired=$(printf '%s\\n' \"$info\" | awk '/Paired:/ {print $2; exit}'); trusted=$(printf '%s\\n' \"$info\" | awk '/Trusted:/ {print $2; exit}'); icon=$(printf '%s\\n' \"$info\" | awk '/Icon:/ {print $2; exit}'); battery=$(printf '%s\\n' \"$info\" | awk '/Battery Percentage:/ {value=$NF; gsub(/[()]/, \"\", value); print value; exit}'); printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$address\" \"$name\" \"${connected:-no}\" \"${paired:-no}\" \"${trusted:-no}\" \"$icon\" \"${battery:--1}\"; done"]
+        running: true
+        stdout: StdioCollector {
+            id: bluetoothSnapshotOutput
+            onStreamFinished: root.updateBluetoothDevices(bluetoothSnapshotOutput.text)
+        }
+    }
+
+    Process {
+        id: bluetoothMonitor
+        command: ["bluetoothctl", "--monitor"]
+        running: true
+        stdout: SplitParser {
+            onRead: line => bluetoothMonitorRefresh.restart()
+        }
+        onExited: bluetoothMonitorRestart.restart()
+    }
+
+    Timer {
+        id: bluetoothMonitorRefresh
+        interval: 500
+        repeat: false
+        onTriggered: root.refreshBluetoothSnapshot()
+    }
+
+    Timer {
+        id: bluetoothMonitorRestart
+        interval: 1500
+        repeat: false
+        onTriggered: if (!bluetoothMonitor.running) bluetoothMonitor.running = true
     }
 
     Process {
@@ -1063,12 +1612,58 @@ ShellRoot {
     }
 
     Process {
+        id: wifiProfilesQuery
+        command: ["sh", "-c", "nmcli -t -f UUID,TYPE connection show 2>/dev/null | while IFS=: read -r uuid type; do [ \"$type\" = 802-11-wireless ] || [ \"$type\" = wifi ] || continue; values=$(nmcli --escape no -g connection.id,802-11-wireless.ssid connection show uuid \"$uuid\" 2>/dev/null); name=$(printf '%s\\n' \"$values\" | sed -n '1p'); ssid=$(printf '%s\\n' \"$values\" | sed -n '2p'); printf '%s\\t%s\\t%s\\n' \"$uuid\" \"$name\" \"$ssid\"; done"]
+        stdout: StdioCollector {
+            id: wifiProfilesOutput
+            onStreamFinished: root.updateWifiProfiles(wifiProfilesOutput.text)
+        }
+    }
+
+    Process {
         id: wifiStateQuery
         command: ["sh", "-c", "radio=$(nmcli radio wifi 2>/dev/null); device=$(nmcli -t -f DEVICE,TYPE device status 2>/dev/null | awk -F: '$2 == \"wifi\" {print $1; exit}'); printf '%s\\n%s\\n' \"$radio\" \"$device\""]
         stdout: StdioCollector {
             id: wifiStateOutput
             onStreamFinished: root.updateWifiState(wifiStateOutput.text)
         }
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0 && root.wifiAvailable && root.wifiEnabled && !networkDevicesQuery.running)
+                networkDevicesQuery.running = true
+            else
+                root.networkScanning = false
+        }
+    }
+
+    Process {
+        id: networkMonitor
+        command: ["nmcli", "monitor"]
+        running: true
+        stdout: SplitParser {
+            onRead: line => networkMonitorRefresh.restart()
+        }
+        onExited: networkMonitorRestart.restart()
+    }
+
+    Timer {
+        id: networkMonitorRefresh
+        interval: 600
+        repeat: false
+        onTriggered: {
+            if (!wifiStateQuery.running)
+                wifiStateQuery.running = true
+            if (!networkMetricsQuery.running)
+                networkMetricsQuery.running = true
+            if (settingsWindow.visible && root.settingsPage === "Network")
+                root.refreshVpnSettings()
+        }
+    }
+
+    Timer {
+        id: networkMonitorRestart
+        interval: 1500
+        repeat: false
+        onTriggered: if (!networkMonitor.running) networkMonitor.running = true
     }
 
     Process {
@@ -1082,10 +1677,18 @@ ShellRoot {
 
     Process {
         id: displayQuery
-        command: ["sh", "-c", "xrandr --query 2>/dev/null | awk '$2 == \"connected\" { name=$1; primary=($3 == \"primary\" ? \"primary\" : \"secondary\"); next } $2 == \"disconnected\" { name=\"\"; next } name && $1 ~ /^[0-9]+x[0-9]+$/ { mode=$1; for (i=2; i<=NF; i++) { rate=$i; selected=(rate ~ /\\*/ ? \"selected\" : \"available\"); gsub(/[^0-9.]/, \"\", rate); if (rate ~ /[0-9]/) print name \"\\tconnected\\t\" primary \"\\t\" mode \"\\t\" rate \"\\t\" selected } }'"]
+        command: ["sh", "-c", "xrandr --query 2>/dev/null | awk '$2 == \"connected\" { name=$1; primary=($3 == \"primary\" ? \"primary\" : \"secondary\"); geometry=\"\"; rotation=\"normal\"; for (i=3; i<=NF; i++) { if ($i ~ /^[0-9]+x[0-9]+[+-][0-9]+[+-][0-9]+/) geometry=$i; if ($i == \"left\" || $i == \"right\" || $i == \"inverted\") rotation=$i } next } $2 == \"disconnected\" { name=\"\"; next } name && $1 ~ /^[0-9]+x[0-9]+$/ { mode=$1; for (i=2; i<=NF; i++) { rate=$i; selected=(rate ~ /\\*/ ? \"selected\" : \"available\"); gsub(/[^0-9.]/, \"\", rate); if (rate ~ /[0-9]/) print name \"\\tconnected\\t\" primary \"\\t\" mode \"\\t\" rate \"\\t\" selected \"\\t\" geometry \"\\t\" rotation } }'"]
         stdout: StdioCollector {
             id: displayOutput
             onStreamFinished: root.updateDisplays(displayOutput.text)
+        }
+        onExited: {
+            if (root.displayRefreshAfterCurrent) {
+                root.displayRefreshAfterCurrent = false
+                Qt.callLater(root.refreshDisplays)
+            } else {
+                root.displayRefreshPending = false
+            }
         }
     }
 
@@ -1157,7 +1760,6 @@ ShellRoot {
     Process {
         id: publicIpQuery
         command: ["sh", "-c", "curl -4 -fsS --max-time 3 https://api.ipify.org 2>/dev/null"]
-        running: true
         stdout: StdioCollector {
             id: publicIpOutput
             onStreamFinished: root.publicIp = publicIpOutput.text.trim()
@@ -1166,10 +1768,14 @@ ShellRoot {
 
     Process {
         id: activeWindowQuery
-        command: ["sh", "-c", "id=$(xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | awk '{print $5}'); if [ -n \"$id\" ] && [ \"$id\" != \"0x0\" ]; then printf '%s\\n' \"$id\"; xprop -id \"$id\" _NET_WM_PID 2>/dev/null | awk '{print $3}'; fi"]
+        property string queryId: ""
         stdout: StdioCollector {
             id: activeWindowOutput
             onStreamFinished: root.updateActiveWindow(activeWindowOutput.text)
+        }
+        onExited: {
+            if (queryId !== root.pendingActiveWindowId)
+                Qt.callLater(root.startActiveWindowQuery)
         }
     }
 
@@ -1177,38 +1783,18 @@ ShellRoot {
         interval: 1000
         repeat: true
         running: true
-        onTriggered: {
-            if (!bspwmQuery.running)
-                bspwmQuery.running = true
-            if (!workspaceQuery.running)
-                workspaceQuery.running = true
-            if (!windowTitleQuery.running)
-                windowTitleQuery.running = true
-            if (!statusQuery.running)
-                statusQuery.running = true
-            if (!micStatusQuery.running)
-                micStatusQuery.running = true
-            if (!networkMetricsQuery.running)
-                networkMetricsQuery.running = true
-            if (!tailscaleQuery.running)
-                tailscaleQuery.running = true
-            if (!exitConfigQuery.running)
-                exitConfigQuery.running = true
-            if (!activeWindowQuery.running)
-                activeWindowQuery.running = true
-            root.refreshNowPlaying()
-        }
+        onTriggered: if (!networkMetricsQuery.running) networkMetricsQuery.running = true
     }
 
     Timer {
-        interval: 10000
+        interval: 30000
         repeat: true
         running: true
         onTriggered: {
-            if (!publicIpQuery.running)
-                publicIpQuery.running = true
             if (!batteryQuery.running)
                 batteryQuery.running = true
+            if (settingsWindow.visible && root.settingsPage === "Network")
+                root.refreshVpnSettings()
         }
     }
 
@@ -1350,16 +1936,16 @@ ShellRoot {
         id: bar
         screen: root.primaryScreen()
         anchors { top: true; left: true; right: true }
-        implicitHeight: root.panelHeight
-        exclusiveZone: root.panelHeight
+        implicitHeight: root.effectivePanelHeight
+        exclusiveZone: root.effectivePanelHeight
         color: background
         aboveWindows: true
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: 16
-            anchors.rightMargin: 10
-            spacing: 8
+            anchors.leftMargin: 16 * root.menuScale
+            anchors.rightMargin: 10 * root.menuScale
+            spacing: 8 * root.menuScale
 
             RowLayout {
                 Layout.alignment: Qt.AlignVCenter
@@ -1370,24 +1956,28 @@ ShellRoot {
 
                     delegate: Item {
                         required property var modelData
-                        implicitWidth: 19.4
-                        implicitHeight: root.panelHeight
+                        implicitWidth: 19.4 * root.menuScale
+                        implicitHeight: root.effectivePanelHeight
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Workspace " + modelData.name
+                        Keys.onReturnPressed: root.focusWorkspace(modelData.name)
+                        Keys.onEnterPressed: root.focusWorkspace(modelData.name)
 
                         Rectangle {
                             anchors.centerIn: parent
-                            width: 9.4
-                            height: 9.4
+                            width: 9.4 * root.menuScale
+                            height: 9.4 * root.menuScale
                             radius: 1
                             color: modelData.active ? foreground : (modelData.urgent ? "#f38ba8" : "transparent")
-                            border.width: modelData.occupied && !modelData.active ? 1 : 0
-                            border.color: accent
+                            border.width: 0
 
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData.name
                                 color: foreground
                                 font.family: "JetBrains Mono"
-                                font.pixelSize: 13
+                                font.pixelSize: 13 * root.displayFontScale
                                 font.weight: Font.DemiBold
                             }
                         }
@@ -1409,49 +1999,58 @@ ShellRoot {
 
             Text {
                 Layout.fillWidth: true
-                Layout.leftMargin: 8
+                Layout.leftMargin: 8 * root.menuScale
                 text: activeTitle.length > 48 ? activeTitle.slice(0, 48) + "..." : (activeTitle || "Desktop")
                 color: foreground
                 elide: Text.ElideRight
                 font.family: "JetBrains Mono"
-                font.pixelSize: 13
+                font.pixelSize: 13 * root.displayFontScale
                 font.weight: Font.DemiBold
             }
 
             RowLayout {
-                Layout.rightMargin: 8
-                spacing: 30
+                Layout.rightMargin: 8 * root.menuScale
+                spacing: (bar.width < 1000 * root.menuScale ? 14 : 24) * root.menuScale
+
+
 
                 Text {
                     visible: root.batteryCapacity >= 0
                     text: (root.batteryStatus === "Charging" ? "󰂄" : root.batteryCapacity <= 15 ? "󰁺" : root.batteryCapacity <= 35 ? "󰁼" : root.batteryCapacity <= 65 ? "󰁾" : "󰂀") + " " + root.batteryCapacity + "%"
                     color: root.batteryCapacity <= 15 ? "#f38ba8" : foreground
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 13
+                    font.pixelSize: 13 * root.displayFontScale
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Battery " + root.batteryCapacity + " percent. Open session settings"
+                    Keys.onReturnPressed: root.openSettings("Session")
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: root.run(["wezterm", "-e", "btop"])
+                        onClicked: root.openSettings("Session")
                     }
                 }
 
                 RowLayout {
-                    spacing: 4
+                    spacing: 4 * root.menuScale
 
                     Repeater {
                         model: SystemTray.items
 
                         delegate: Item {
                             required property var modelData
-                            implicitWidth: 19
-                            implicitHeight: 19
+                            implicitWidth: 19 * root.menuScale
+                            implicitHeight: 19 * root.menuScale
+                            activeFocusOnTab: true
+                            Accessible.role: Accessible.Button
+                            Accessible.name: modelData.title || "System tray item"
 
                             Image {
                                 anchors.centerIn: parent
                                 source: modelData.icon
-                                sourceSize.width: 13
-                                sourceSize.height: 13
-                                width: 13
-                                height: 13
+                                sourceSize.width: 13 * root.menuScale
+                                sourceSize.height: 13 * root.menuScale
+                                width: 13 * root.menuScale
+                                height: 13 * root.menuScale
                             }
 
                             MouseArea {
@@ -1477,7 +2076,11 @@ ShellRoot {
                     text: audioStatus
                     color: foreground
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 16
+                    font.pixelSize: 16 * root.displayFontScale
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: root.outputMuted ? "Audio muted" : "Audio " + Math.round(root.volumeLevel) + " percent"
+                    Keys.onReturnPressed: root.togglePopup(volumePopup)
 
                     MouseArea {
                         id: audioMouseArea
@@ -1486,13 +2089,12 @@ ShellRoot {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onClicked: event => {
                             if (event.button === Qt.RightButton)
-                                root.run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"])
+                                root.toggleOutputMute()
                             else
                                 root.togglePopup(volumePopup)
                         }
                         onWheel: event => {
-                            const amount = event.angleDelta.y > 0 ? "+5%" : "-5%"
-                            root.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", amount])
+                            root.setVolume(Math.max(0, Math.min(1, root.volumeLevel / 100 + (event.angleDelta.y > 0 ? 0.05 : -0.05))))
                         }
                     }
                 }
@@ -1501,7 +2103,11 @@ ShellRoot {
                     text: networkStatus
                     color: foreground
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 16
+                    font.pixelSize: 16 * root.displayFontScale
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Network " + root.networkDetail
+                    Keys.onReturnPressed: root.togglePopup(networkPopup)
                     MouseArea {
                         id: networkMouseArea
                         anchors.fill: parent
@@ -1515,7 +2121,11 @@ ShellRoot {
                     text: bluetoothStatus
                     color: foreground
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 16
+                    font.pixelSize: 16 * root.displayFontScale
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Bluetooth " + root.bluetoothDetail
+                    Keys.onReturnPressed: root.togglePopup(bluetoothPopup)
                     MouseArea {
                         id: bluetoothMouseArea
                         anchors.fill: parent
@@ -1529,7 +2139,11 @@ ShellRoot {
                     text: "󰂚"
                     color: foreground
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 14
+                    font.pixelSize: 14 * root.displayFontScale
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: notificationServer.trackedNotifications.values.length + " notifications"
+                    Keys.onReturnPressed: root.togglePopup(notificationPopup)
                     MouseArea {
                         id: notificationMouseArea
                         anchors.fill: parent
@@ -1547,8 +2161,12 @@ ShellRoot {
             text: Qt.formatDateTime(new Date(), "ddd dd  HH:mm")
             color: foreground
             font.family: "JetBrains Mono"
-            font.pixelSize: 13
+            font.pixelSize: 13 * root.displayFontScale
             font.weight: Font.DemiBold
+            activeFocusOnTab: true
+            Accessible.role: Accessible.Button
+            Accessible.name: "Open calendar"
+            Keys.onReturnPressed: root.togglePopup(calendarPopup)
             Timer {
                 interval: 1000
                 repeat: true
@@ -1564,17 +2182,26 @@ ShellRoot {
     }
 
     LayoutPopup { id: layoutPopup; root: root; bar: bar }
+    OperationToast { shellRoot: root; barWindow: bar }
+    WifiPasswordDialog { id: wifiPasswordDialog; shellRoot: root }
+
+    Shortcut {
+        sequence: "Escape"
+        context: Qt.ApplicationShortcut
+        enabled: calendarPopup.visible || volumePopup.visible || networkPopup.visible || bluetoothPopup.visible || tailscalePopup.visible || exitNodePopup.visible || notificationPopup.visible || layoutPopup.visible
+        onActivated: root.closePopups()
+    }
 
     Window {
         id: quickNotePopup
         visible: false
         title: "Quick Org note"
         x: root.quickNoteCentered ? root.centerX(width) : (root.primaryScreen() ? root.primaryScreen().x + root.primaryScreen().width - width - 10 : Screen.width - width - 10)
-        y: root.quickNoteCentered ? root.centerY(height) : (root.primaryScreen() ? root.primaryScreen().y + root.panelHeight + 2 : root.panelHeight + 2)
+        y: root.quickNoteCentered ? root.centerY(height) : (root.primaryScreen() ? root.primaryScreen().y + root.effectivePanelHeight + 2 : root.effectivePanelHeight + 2)
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Dialog
         color: "transparent"
-        width: 430 * menuScale
-        height: 330 * menuScale
+        width: root.primaryScreen() ? Math.max(1, Math.min(430 * menuScale, root.primaryScreen().width - 24)) : 430 * menuScale
+        height: root.primaryScreen() ? Math.max(1, Math.min(330 * menuScale, root.primaryScreen().height - root.effectivePanelHeight - 24)) : 330 * menuScale
 
         onVisibleChanged: if (visible) quickNoteFocusTimer.restart()
 
@@ -1679,12 +2306,12 @@ ShellRoot {
                     Layout.fillWidth: true
                     Text { text: quickNoteBody.length + " characters"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 8 }
                     Item { Layout.fillWidth: true }
-                    Text { text: "Ctrl+Enter to save"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 8 }
+                    Text { text: root.noteSaveError || (root.noteSaving ? "Saving..." : "Ctrl+Enter to save"); color: root.noteSaveError.length > 0 ? "#f38ba8" : muted; font.family: "JetBrains Mono"; font.pixelSize: 8; elide: Text.ElideRight; Layout.maximumWidth: 220 }
                     Button {
                         implicitWidth: 78
                         implicitHeight: 34
-                        text: "Save"
-                        enabled: quickNoteTitle.text.trim().length > 0 || quickNoteBody.text.trim().length > 0
+                        text: root.noteSaving ? "Saving..." : "Save"
+                        enabled: !root.noteSaving && (quickNoteTitle.text.trim().length > 0 || quickNoteBody.text.trim().length > 0)
                         onClicked: root.saveQuickNote()
                         contentItem: Text { text: parent.text; color: parent.enabled ? background : muted; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9; font.weight: Font.DemiBold }
                         background: Rectangle { radius: 9; color: parent.enabled ? (parent.down ? foreground : accent) : settingsSurface; border.width: 1; border.color: parent.enabled ? accent : settingsOutline }
@@ -1702,8 +2329,8 @@ ShellRoot {
         anchor.rect.y: bar.height + 2
         grabFocus: true
         color: "transparent"
-        implicitWidth: 330 * menuScale
-        implicitHeight: 370 * menuScale
+        implicitWidth: Math.min(330 * menuScale, bar.width - 16)
+        implicitHeight: Math.min(600 * menuScale, bar.screen.height - bar.height - 12)
 
         Rectangle {
             anchors.fill: parent
@@ -1722,13 +2349,14 @@ ShellRoot {
                     Layout.fillWidth: true
 
                     Button {
+                        id: calendarPreviousButton
                         implicitWidth: 34
                         implicitHeight: 34
                         text: "‹"
                         onClicked: root.changeCalendarMonth(-1)
                         contentItem: Text {
-                            text: parent.text
-                            color: parent.hovered ? background : foreground
+                            text: calendarPreviousButton.text
+                            color: calendarPreviousButton.down ? background : foreground
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             font.family: "JetBrains Mono"
@@ -1736,9 +2364,9 @@ ShellRoot {
                         }
                         background: Rectangle {
                             radius: 9
-                            color: parent.pressed ? accent : (parent.hovered ? "#252536" : "#171820")
+                            color: calendarPreviousButton.down ? accent : (calendarPreviousButton.hovered ? settingsRaised : settingsSurface)
                             border.width: 1
-                            border.color: parent.hovered ? accent : "#373b41"
+                            border.color: calendarPreviousButton.activeFocus || calendarPreviousButton.hovered ? accent : settingsOutline
                         }
                     }
 
@@ -1753,13 +2381,37 @@ ShellRoot {
                     }
 
                     Button {
+                        id: calendarTodayButton
+                        implicitWidth: 54
+                        implicitHeight: 30
+                        text: "Today"
+                        onClicked: root.resetCalendar()
+                        contentItem: Text {
+                            text: calendarTodayButton.text
+                            color: calendarTodayButton.down ? background : foreground
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 9 * root.menuFontScale
+                            font.weight: Font.DemiBold
+                        }
+                        background: Rectangle {
+                            radius: 9
+                            color: calendarTodayButton.down ? accent : (calendarTodayButton.hovered ? settingsRaised : settingsSurface)
+                            border.width: 1
+                            border.color: calendarTodayButton.activeFocus || calendarTodayButton.hovered ? accent : settingsOutline
+                        }
+                    }
+
+                    Button {
+                        id: calendarNextButton
                         implicitWidth: 34
                         implicitHeight: 34
                         text: "›"
                         onClicked: root.changeCalendarMonth(1)
                         contentItem: Text {
-                            text: parent.text
-                            color: parent.hovered ? background : foreground
+                            text: calendarNextButton.text
+                            color: calendarNextButton.down ? background : foreground
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             font.family: "JetBrains Mono"
@@ -1767,9 +2419,9 @@ ShellRoot {
                         }
                         background: Rectangle {
                             radius: 9
-                            color: parent.pressed ? accent : (parent.hovered ? "#252536" : "#171820")
+                            color: calendarNextButton.down ? accent : (calendarNextButton.hovered ? settingsRaised : settingsSurface)
                             border.width: 1
-                            border.color: parent.hovered ? accent : "#373b41"
+                            border.color: calendarNextButton.activeFocus || calendarNextButton.hovered ? accent : settingsOutline
                         }
                     }
                 }
@@ -1781,7 +2433,7 @@ ShellRoot {
                     rowSpacing: 4
 
                     Repeater {
-                        model: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                        model: root.calendarWeekdayNames()
                         delegate: Text {
                             required property string modelData
                             Layout.fillWidth: true
@@ -1814,20 +2466,96 @@ ShellRoot {
                         }
                     }
                 }
+
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: settingsOutline }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text { text: "Upcoming"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        id: calendarRefreshButton
+                        implicitWidth: 72
+                        implicitHeight: 30
+                        text: agendaQuery.running ? "Refreshing..." : "Refresh"
+                        enabled: !agendaQuery.running
+                        onClicked: agendaQuery.running = true
+                        contentItem: Text {
+                            text: calendarRefreshButton.text
+                            color: calendarRefreshButton.enabled ? foreground : muted
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 9 * root.menuFontScale
+                        }
+                        background: Rectangle {
+                            radius: 9
+                            color: calendarRefreshButton.down ? accent : (calendarRefreshButton.hovered ? settingsRaised : settingsSurface)
+                            border.width: 1
+                            border.color: calendarRefreshButton.activeFocus || calendarRefreshButton.hovered ? accent : settingsOutline
+                        }
+                    }
+                }
+
+                ListView {
+                    id: agendaList
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: 5
+                    model: root.agendaEvents
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: agendaList.width
+                        height: 48
+                        radius: 7
+                        color: settingsSurface
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
+                                Text { Layout.fillWidth: true; text: modelData.summary; color: foreground; font.family: "Noto Sans"; font.pixelSize: 10 * root.menuFontScale; elide: Text.ElideRight }
+                                Text { Layout.fillWidth: true; text: modelData.localDisplay + (modelData.location ? "  ·  " + modelData.location : ""); color: muted; font.family: "JetBrains Mono"; font.pixelSize: 8 * root.menuFontScale; elide: Text.ElideRight }
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    visible: root.agendaEvents.length === 0
+                    Layout.fillWidth: true
+                    text: root.agendaError || (root.agendaConfigured ? "No upcoming events" : "Add ~/.config/proton-calendar-url to enable agenda")
+                    color: root.agendaError.length > 0 ? "#f38ba8" : muted
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: 9
+                }
             }
         }
     }
 
-    PopupWindow {
+    VolumePopup {
         id: volumePopup
+        shellRoot: root
+        barWindow: bar
+    }
+
+    Component {
+        id: legacyVolumePopup
+
+    PopupWindow {
+        id: legacyVolumePopupWindow
         visible: false
         anchor.window: bar
-        anchor.rect.x: bar.width - volumePopup.implicitWidth - 10
+        anchor.rect.x: bar.width - legacyVolumePopupWindow.implicitWidth - 10
         anchor.rect.y: bar.height + 2
         grabFocus: true
         color: "transparent"
-        implicitWidth: 360 * menuScale
-        implicitHeight: 300 * menuScale
+        implicitWidth: Math.min(360 * menuScale, bar.width - 16)
+        implicitHeight: Math.min(300 * menuScale, bar.screen.height - bar.height - 12)
 
         Rectangle {
             anchors.fill: parent
@@ -1895,7 +2623,7 @@ ShellRoot {
                         font.weight: Font.DemiBold
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: root.run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"])
+                            onClicked: root.toggleOutputMute()
                         }
                     }
 
@@ -2214,133 +2942,6 @@ ShellRoot {
             }
         }
     }
-
-    PopupWindow {
-        id: audioSettingsPopup
-        visible: false
-        anchor.window: bar
-        anchor.rect.x: bar.width - audioSettingsPopup.implicitWidth - 10
-        anchor.rect.y: bar.height + 2
-        grabFocus: true
-        color: "transparent"
-        implicitWidth: 400
-        implicitHeight: 520
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 0
-            color: background
-            border.width: 1
-            border.color: accent
-            radius: 1
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 18
-                spacing: 8
-
-                Text {
-                    text: "Audio devices"
-                    color: foreground
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 15 * root.menuFontScale
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    text: "Output sinks"
-                    color: muted
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 10 * root.menuFontScale
-                }
-
-                ListView {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 145
-                    clip: true
-                    spacing: 4
-                    model: root.audioSinks
-
-                    delegate: Rectangle {
-                        required property var modelData
-                        width: parent ? parent.width : 0
-                        height: 38
-                                 radius: 10
-                                 color: modelData.name === root.defaultSinkName ? settingsRaised : settingsSurface
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: 10
-                            spacing: 1
-
-                            Text {
-                                text: modelData.description || modelData.name
-                                color: foreground
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 10 * root.menuFontScale
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-
-                            Text {
-                                text: modelData.name
-                                color: muted
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 8 * root.menuFontScale
-                                elide: Text.ElideMiddle
-                                Layout.fillWidth: true
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.setDefaultSink(modelData.name)
-                        }
-                    }
-                }
-
-                Text {
-                    text: "Microphone sources"
-                    color: muted
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 10 * root.menuFontScale
-                }
-
-                ListView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    spacing: 4
-                    model: root.audioSources
-
-                    delegate: Rectangle {
-                        required property var modelData
-                        width: parent ? parent.width : 0
-                        height: 38
-                                 radius: 10
-                                 color: modelData.name === root.defaultSourceName ? settingsRaised : settingsSurface
-
-                        Text {
-                            anchors.fill: parent
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: 10
-                            text: modelData.description || modelData.name
-                            color: foreground
-                            verticalAlignment: Text.AlignVCenter
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 10 * root.menuFontScale
-                            elide: Text.ElideRight
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.setDefaultSource(modelData.name)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     PopupWindow {
@@ -2351,8 +2952,8 @@ ShellRoot {
         anchor.rect.y: bar.height + 2
         grabFocus: true
         color: "transparent"
-        implicitWidth: 300 * menuScale
-        implicitHeight: 560 * menuScale
+        implicitWidth: Math.min(300 * menuScale, bar.width - 16)
+        implicitHeight: Math.min(560 * menuScale, bar.screen.height - bar.height - 12)
 
         Rectangle {
             anchors.fill: parent
@@ -2604,8 +3205,10 @@ ShellRoot {
         anchor.rect.y: bar.height + 2
         grabFocus: true
         color: "transparent"
-        implicitWidth: 300 * menuScale
-        implicitHeight: 140 * menuScale
+        implicitWidth: Math.min(300 * menuScale, bar.width - 16)
+        implicitHeight: Math.min(390 * menuScale, bar.screen.height - bar.height - 12)
+
+        onVisibleChanged: if (visible) root.refreshBluetoothDevices()
 
         Rectangle {
             anchors.fill: parent
@@ -2654,8 +3257,76 @@ ShellRoot {
                             color: muted
                             font.family: "JetBrains Mono"
                             font.pixelSize: 10 * root.menuFontScale
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
                         }
                     }
+
+                    PopupIconButton {
+                        text: root.bluetoothEnabled ? "󰂲" : "󰂯"
+                        enabled: root.bluetoothAvailable && !root.bluetoothActionBusy
+                        foregroundColor: foreground
+                        mutedColor: muted
+                        accentColor: accent
+                        hoverColor: settingsRaised
+                        Accessible.name: root.bluetoothEnabled ? "Disable Bluetooth" : "Enable Bluetooth"
+                        onClicked: root.setBluetoothEnabled(!root.bluetoothEnabled)
+                    }
+                }
+
+                ListView {
+                    id: bluetoothPopupList
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: 5
+                    model: root.bluetoothDevices
+
+                    delegate: Rectangle {
+                        id: popupBluetoothDevice
+                        required property var modelData
+                        width: bluetoothPopupList.width
+                        height: 48
+                        radius: 8
+                        color: modelData.connected ? settingsRaised : settingsSurface
+                        border.width: 1
+                        border.color: modelData.connected ? accent : settingsOutline
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 9
+                            Text { text: modelData.connected ? "󰂱" : "󰂯"; color: modelData.connected ? accent : muted; font.family: "JetBrains Mono"; font.pixelSize: 15 }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
+                                Text { Layout.fillWidth: true; text: popupBluetoothDevice.modelData.name || "Unknown device"; color: foreground; font.family: "Noto Sans"; font.pixelSize: 10 * root.menuFontScale; elide: Text.ElideRight }
+                                Text {
+                                    text: (popupBluetoothDevice.modelData.battery >= 0 ? popupBluetoothDevice.modelData.battery + "%  ·  " : "")
+                                        + (popupBluetoothDevice.modelData.connected ? "Connected" : popupBluetoothDevice.modelData.paired ? "Paired" : "Ready to pair")
+                                    color: muted
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: 8 * root.menuFontScale
+                                }
+                            }
+                            Text { text: modelData.connected ? "Disconnect" : modelData.paired ? "Connect" : "Pair"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 8 * root.menuFontScale }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: !root.bluetoothActionBusy
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.connectBluetooth(popupBluetoothDevice.modelData.address, popupBluetoothDevice.modelData.connected, popupBluetoothDevice.modelData.paired)
+                        }
+                    }
+                }
+
+                Text {
+                    visible: root.bluetoothDevices.length === 0
+                    Layout.fillWidth: true
+                    text: root.bluetoothScanning ? "Scanning for devices..." : root.bluetoothEnabled ? "No Bluetooth devices found" : "Bluetooth is disabled"
+                    color: muted
+                    horizontalAlignment: Text.AlignHCenter
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: 9 * root.menuFontScale
                 }
 
                 Button {
@@ -2690,8 +3361,8 @@ ShellRoot {
         anchor.rect.y: bar.height + 2
         grabFocus: true
         color: "transparent"
-        implicitWidth: 340 * menuScale
-        implicitHeight: 420 * menuScale
+        implicitWidth: Math.min(340 * menuScale, bar.width - 16)
+        implicitHeight: Math.min(420 * menuScale, bar.screen.height - bar.height - 12)
 
         Rectangle {
             anchors.fill: parent
@@ -2811,8 +3482,8 @@ ShellRoot {
         anchor.rect.y: networkPopup.height + 4
         grabFocus: true
         color: "transparent"
-        implicitWidth: 300 * menuScale
-        implicitHeight: 360 * menuScale
+        implicitWidth: Math.min(300 * menuScale, bar.width - 16)
+        implicitHeight: Math.min(360 * menuScale, bar.screen.height - bar.height - 12)
 
         Rectangle {
             anchors.fill: parent
@@ -2982,8 +3653,8 @@ ShellRoot {
         anchor.rect.y: bar.height + 2
         grabFocus: true
         color: "transparent"
-        implicitWidth: 420 * menuScale
-        implicitHeight: 620 * menuScale
+        implicitWidth: Math.min(420 * menuScale, bar.width - 16)
+        implicitHeight: Math.min(620 * menuScale, bar.screen.height - bar.height - 12)
 
         Rectangle {
             anchors.fill: parent
@@ -3014,6 +3685,25 @@ ShellRoot {
                         color: accent
                         font.family: "JetBrains Mono"
                         font.pixelSize: 13 * root.menuFontScale
+                    }
+                    Button {
+                        text: root.doNotDisturb ? "" : ""
+                        Accessible.name: root.doNotDisturb ? "Disable do not disturb" : "Enable do not disturb"
+                        onClicked: root.doNotDisturb = !root.doNotDisturb
+                        contentItem: Text {
+                            text: parent.text
+                            color: foreground
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 14 * root.menuFontScale
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        background: Rectangle {
+                            radius: 7
+                            color: parent.hovered ? "#252536" : "#171820"
+                            border.width: 1
+                            border.color: "#373b41"
+                        }
                     }
                 }
 
@@ -3051,11 +3741,15 @@ ShellRoot {
                     model: notificationServer.trackedNotifications
 
                     delegate: Rectangle {
+                        id: notificationCard
                         required property var modelData
+                        readonly property color urgencyColor: modelData.urgency === 2 ? "#f38ba8" : (modelData.urgency === 0 ? muted : accent)
                         width: notificationList.width
                         height: notificationCardContent.implicitHeight + 24
                         radius: 8
                         color: "#171820"
+                        border.width: 1
+                        border.color: urgencyColor
                         clip: true
 
                         ColumnLayout {
@@ -3066,22 +3760,54 @@ ShellRoot {
 
                             RowLayout {
                                 Layout.fillWidth: true
+                                spacing: 8
+                                Rectangle {
+                                    Layout.preferredWidth: 26
+                                    Layout.preferredHeight: 26
+                                    radius: 7
+                                    color: settingsRaised
+                                    clip: true
+                                    Image {
+                                        id: notificationIcon
+                                        anchors.fill: parent
+                                        anchors.margins: 4
+                                        source: root.notificationImage(modelData)
+                                        visible: source.toString().length > 0
+                                        fillMode: Image.PreserveAspectFit
+                                    }
+                                    Text {
+                                        anchors.centerIn: parent
+                                        visible: !notificationIcon.visible || notificationIcon.status === Image.Error
+                                        text: "󰂚"
+                                        color: notificationCard.urgencyColor
+                                        font.family: "JetBrains Mono"
+                                        font.pixelSize: 13
+                                    }
+                                }
                                 Text {
                                     text: modelData.appName || "Notification"
-                                    color: accent
+                                    color: notificationCard.urgencyColor
                                     font.family: "JetBrains Mono"
                                     font.pixelSize: 10 * root.menuFontScale
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
                                 }
                                 Text {
-                                    text: "×"
+                                    text: root.notificationTime(modelData.id)
                                     color: muted
-                                    font.pixelSize: 16 * root.menuFontScale
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: modelData.dismiss()
-                                    }
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: 8 * root.menuFontScale
+                                }
+                                PopupIconButton {
+                                    text: "×"
+                                    implicitWidth: 26
+                                    implicitHeight: 26
+                                    foregroundColor: foreground
+                                    mutedColor: muted
+                                    accentColor: notificationCard.urgencyColor
+                                    hoverColor: settingsRaised
+                                    Accessible.name: "Dismiss notification"
+                                    onClicked: modelData.dismiss()
                                 }
                             }
 
@@ -3126,12 +3852,9 @@ ShellRoot {
 
     Timer {
         id: notificationToastTimer
-        interval: toastNotification && toastNotification.expireTimeout > 0 ? toastNotification.expireTimeout : 5000
+        interval: toastNotification && toastNotification.expireTimeout > 0 ? toastNotification.expireTimeout * 1000 : 5000
         repeat: false
-        onTriggered: {
-            notificationToast.visible = false
-            toastNotification = null
-        }
+        onTriggered: root.clearNotificationToast("expire")
     }
 
     PopupWindow {
@@ -3141,7 +3864,7 @@ ShellRoot {
         anchor.rect.x: bar.width - width - 12
         anchor.rect.y: bar.height + 12
         color: "transparent"
-        implicitWidth: 380
+        implicitWidth: Math.min(380, bar.width - 24)
         implicitHeight: notificationToastContent.implicitHeight + 28
 
         Rectangle {
@@ -3163,6 +3886,31 @@ ShellRoot {
 
                 RowLayout {
                     Layout.fillWidth: true
+                    spacing: 8
+
+                    Rectangle {
+                        Layout.preferredWidth: 28
+                        Layout.preferredHeight: 28
+                        radius: 7
+                        color: settingsRaised
+                        clip: true
+                        Image {
+                            id: toastIcon
+                            anchors.fill: parent
+                            anchors.margins: 4
+                            source: root.notificationImage(toastNotification)
+                            visible: source.toString().length > 0
+                            fillMode: Image.PreserveAspectFit
+                        }
+                        Text {
+                            anchors.centerIn: parent
+                            visible: !toastIcon.visible || toastIcon.status === Image.Error
+                            text: "󰂚"
+                            color: toastNotification && toastNotification.urgency === 2 ? "#f38ba8" : accent
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 14
+                        }
+                    }
 
                     Text {
                         text: toastNotification && toastNotification.appName ? toastNotification.appName : "Notification"
@@ -3174,19 +3922,22 @@ ShellRoot {
                     }
 
                     Text {
-                        text: "×"
+                        text: toastNotification ? Qt.formatDateTime(new Date(toastNotification.receivedAt), "HH:mm") : ""
                         color: muted
-                        font.pixelSize: 16 * root.menuFontScale
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: 8 * root.menuFontScale
+                    }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                if (toastNotification)
-                                    toastNotification.dismiss()
-                                notificationToastTimer.stop()
-                                notificationToast.visible = false
-                            }
-                        }
+                    PopupIconButton {
+                        text: "×"
+                        implicitWidth: 26
+                        implicitHeight: 26
+                        foregroundColor: foreground
+                        mutedColor: muted
+                        accentColor: accent
+                        hoverColor: settingsRaised
+                        Accessible.name: "Dismiss notification"
+                        onClicked: root.clearNotificationToast("dismiss")
                     }
                 }
 
@@ -3206,6 +3957,7 @@ ShellRoot {
                     color: muted
                     font.family: "JetBrains Mono"
                     font.pixelSize: 10 * root.menuFontScale
+                    textFormat: Text.PlainText
                     maximumLineCount: 3
                     elide: Text.ElideRight
                     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
@@ -3229,9 +3981,7 @@ ShellRoot {
                             implicitHeight: 30
                             text: modelData.text
                             onClicked: {
-                                modelData.invoke()
-                                notificationToastTimer.stop()
-                                notificationToast.visible = false
+                                root.invokeToastAction(modelData)
                             }
                             contentItem: Text {
                                 text: parent.text
@@ -3264,12 +4014,13 @@ ShellRoot {
         y: root.centerY(height)
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.BypassWindowManagerHint
         color: "transparent"
-        width: 560 * menuScale
+        width: root.primaryScreen() ? Math.max(1, Math.min(560 * menuScale, root.primaryScreen().width - 32)) : 560 * menuScale
         height: 180 * menuScale
 
         onVisibleChanged: {
             if (visible) {
                 powerIndex = 0
+                pendingPowerIndex = -1
                 powerFocusTimer.restart()
             }
         }
@@ -3330,10 +4081,7 @@ ShellRoot {
                     break
                 case Qt.Key_Return:
                 case Qt.Key_Enter:
-                    const powerAction = root.powerActions[powerIndex]
-                    root.closePopups()
-                    if (powerAction.command)
-                        root.run(powerAction.command)
+                    root.activatePowerAction(powerIndex)
                     event.accepted = true
                     break
                 case Qt.Key_Escape:
@@ -3381,12 +4129,8 @@ ShellRoot {
                             implicitHeight: 92
                             focusPolicy: Qt.NoFocus
                             readonly property bool selected: index === root.powerIndex
-                            onClicked: {
-                                root.powerIndex = index
-                                root.closePopups()
-                                if (modelData.command)
-                                    root.run(modelData.command)
-                            }
+                            Accessible.name: root.pendingPowerIndex === index ? "Confirm " + modelData.label : modelData.label
+                            onClicked: root.activatePowerAction(index)
                             contentItem: ColumnLayout {
                                 spacing: 6
                                 Text {
@@ -3398,7 +4142,7 @@ ShellRoot {
                                 }
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
-                                    text: modelData.label
+                                    text: root.pendingPowerIndex === index ? "Confirm " + modelData.label : modelData.label
                                     color: foreground
                                     font.family: "JetBrains Mono"
                                     font.pixelSize: 10
@@ -3581,6 +4325,43 @@ ShellRoot {
     }
 
     Window {
+        id: displayConfirmation
+        visible: false
+        title: "Confirm display settings"
+        x: root.centerX(width)
+        y: root.centerY(height)
+        width: root.primaryScreen() ? Math.min(390, root.primaryScreen().width - 24) : 390
+        height: 160
+        flags: Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        modality: Qt.ApplicationModal
+        color: "transparent"
+
+        Shortcut { sequence: "Escape"; context: Qt.WindowShortcut; onActivated: root.revertDisplayLayout() }
+
+        Rectangle {
+            anchors.fill: parent
+            color: background
+            border.width: 1
+            border.color: accent
+            radius: 8
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 18
+                spacing: 10
+                Text { Layout.fillWidth: true; text: "Keep these display settings?"; color: foreground; font.family: "Noto Sans"; font.pixelSize: 16 * root.menuFontScale; font.weight: Font.DemiBold }
+                Text { Layout.fillWidth: true; text: "The previous layout will be restored automatically in 15 seconds."; color: muted; wrapMode: Text.Wrap; font.family: "JetBrains Mono"; font.pixelSize: 9 * root.menuFontScale }
+                Item { Layout.fillHeight: true }
+                RowLayout {
+                    Layout.alignment: Qt.AlignRight
+                    spacing: 8
+                    Button { text: "Revert"; onClicked: root.revertDisplayLayout() }
+                    Button { text: displayQuery.running || root.displayRefreshPending ? "Reading layout..." : "Keep changes"; enabled: !displayQuery.running && !root.displayRefreshPending; highlighted: true; onClicked: root.keepDisplayLayout() }
+                }
+            }
+        }
+    }
+
+    Window {
         id: polkitWindow
         title: "Authentication Required"
         visible: polkitAgent.isActive
@@ -3656,6 +4437,7 @@ ShellRoot {
 
                 TextField {
                     id: response
+                    visible: polkitAgent.flow ? polkitAgent.flow.isResponseRequired : true
                     Layout.fillWidth: true
                     echoMode: polkitAgent.flow && polkitAgent.flow.responseVisible ? TextInput.Normal : TextInput.Password
                     placeholderTextColor: muted
@@ -3705,7 +4487,7 @@ ShellRoot {
                         implicitHeight: 28
                         text: "Authenticate"
                         highlighted: true
-                        enabled: response.text.length > 0 && polkitAgent.flow !== null
+                        enabled: polkitAgent.flow !== null && (!polkitAgent.flow.isResponseRequired || response.text.length > 0)
                         onClicked: if (polkitAgent.flow) polkitAgent.flow.submit(response.text)
                         contentItem: Text {
                             text: parent.text
@@ -3725,729 +4507,6 @@ ShellRoot {
                     }
                 }
             }
-        }
-    }
-
-    Component {
-        id: legacySettingsComponent
-
-        Window {
-            id: legacySettingsWindow
-        visible: false
-        title: "Settings"
-        x: root.centerX(width)
-        y: root.centerY(height)
-        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
-        color: "transparent"
-        width: root.primaryScreen() ? Math.min(980, root.primaryScreen().width - 48) : 980
-        height: root.primaryScreen() ? Math.min(680, root.primaryScreen().height - 72) : 680
-
-        onVisibleChanged: if (visible) requestActivate()
-        Keys.onEscapePressed: visible = false
-
-        Rectangle {
-            anchors.fill: parent
-            color: settingsSurface
-            border.width: 1
-            border.color: settingsOutline
-            radius: 2
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 22
-                spacing: 22
-
-                ColumnLayout {
-                    Layout.preferredWidth: 210
-                    Layout.fillHeight: true
-                    spacing: 8
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.bottomMargin: 16
-                        Text {
-                            text: "Settings"
-                            color: foreground
-                            font.family: "Inter"
-                            font.pixelSize: 20 * root.menuFontScale
-                            font.weight: Font.DemiBold
-                            Layout.fillWidth: true
-                        }
-                        Button {
-                            text: "×"
-                            implicitWidth: 30
-                            implicitHeight: 30
-                            onClicked: settingsWindow.visible = false
-                            contentItem: Text { text: parent.text; color: muted; font.pixelSize: 22; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                            background: Rectangle { radius: 9; color: parent.hovered ? settingsRaised : "transparent" }
-                        }
-                    }
-
-                    Text {
-                        text: "Control center"
-                        color: muted
-                        font.family: "Inter"
-                        font.pixelSize: 10
-                        Layout.bottomMargin: 5
-                    }
-
-                    Repeater {
-                        model: [
-                            { label: "󰕾  Audio", page: "Audio" },
-                            { label: "󰤨  Network", page: "Network" },
-                            { label: "󰂯  Bluetooth", page: "Bluetooth" },
-                            { label: "󰍹  Displays", page: "Displays" },
-                            { label: "󰏘  Appearance", page: "Appearance" },
-                            { label: "󰐥  Session", page: "Session" }
-                        ]
-
-                        delegate: Button {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            implicitHeight: 42
-                            text: modelData.label
-                            onClicked: root.selectSettingsPage(modelData.page)
-                            contentItem: Text {
-                                text: parent.text
-                                color: root.settingsPage === modelData.page ? background : muted
-                                horizontalAlignment: Text.AlignLeft
-                                verticalAlignment: Text.AlignVCenter
-                                leftPadding: 14
-                                font.family: "Inter"
-                                font.pixelSize: 11 * root.menuFontScale
-                                font.weight: root.settingsPage === modelData.page ? Font.DemiBold : Font.Normal
-                            }
-                            background: Rectangle {
-                                radius: 10
-                                color: root.settingsPage === modelData.page ? accent : (parent.hovered ? settingsRaised : "transparent")
-                            }
-                        }
-                    }
-
-                    Text {
-                        text: "Quick actions"
-                        color: muted
-                        font.family: "Inter"
-                        font.pixelSize: 10
-                        Layout.topMargin: 8
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-                        Repeater {
-                            model: [
-                                { icon: "󰸉", action: "wallpaper" },
-                                { icon: "󰄀", action: "screenshot" },
-                                { icon: "󰌾", action: "lock" }
-                            ]
-                            delegate: Button {
-                                required property var modelData
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: 1
-                                implicitHeight: 36
-                                text: modelData.icon
-                                onClicked: {
-                                    if (modelData.action === "wallpaper")
-                                        root.openWallpaperViewer()
-                                    else if (modelData.action === "screenshot")
-                                        root.openScreenshotMenu()
-                                    else
-                                        root.lockScreen()
-                                }
-                                contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 15 }
-                                background: Rectangle { color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 8 }
-                            }
-                        }
-                    }
-
-                    Item { Layout.fillHeight: true }
-
-                    Text {
-                        text: "ESC  close"
-                        color: muted
-                        font.family: "Inter"
-                        font.pixelSize: 9
-                    }
-                }
-
-                Rectangle {
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 1
-                    color: settingsOutline
-                }
-
-                    StackLayout {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        Layout.leftMargin: 4
-                        currentIndex: root.settingsPage === "Network" ? 1 : root.settingsPage === "Bluetooth" ? 2 : root.settingsPage === "Displays" ? 3 : root.settingsPage === "Appearance" ? 4 : root.settingsPage === "Session" ? 5 : 0
-
-                    ColumnLayout {
-                        spacing: 12
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "Sound"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
-                            Item { Layout.fillWidth: true }
-                            Button {
-                                text: root.audioSinksLoading || root.audioSourcesLoading ? "Refreshing..." : "󰑐  Refresh"
-                                enabled: !root.audioSinksLoading && !root.audioSourcesLoading
-                                onClicked: root.refreshAudioDevices()
-                                contentItem: Text { text: parent.text; color: parent.enabled ? foreground : muted; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                background: Rectangle { implicitWidth: 92; implicitHeight: 30; color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 8 }
-                            }
-                        }
-
-                        Text { text: "Volume, mute state, and default PipeWire devices."; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 10
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: 1
-                                Layout.preferredHeight: 116
-                                color: settingsSurface
-                                border.width: 1
-                                border.color: settingsOutline
-                                radius: 10
-                                ColumnLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 14
-                                    spacing: 6
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text { text: root.outputMuted ? "󰝟  Output muted" : "󰕾  Output"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
-                                        Item { Layout.fillWidth: true }
-                                        Button {
-                                            text: root.outputMuted ? "Unmute" : "Mute"
-                                            onClicked: root.toggleOutputMute()
-                                            contentItem: Text { text: parent.text; color: accent; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                            background: Rectangle { implicitWidth: 58; implicitHeight: 26; color: parent.hovered ? settingsRaised : background; border.width: 1; border.color: settingsOutline; radius: 7 }
-                                        }
-                                    }
-                                    Text { text: Math.round(root.volumeLevel) + "%  •  " + root.audioDetail; color: muted; Layout.fillWidth: true; elide: Text.ElideMiddle; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                    Slider { Layout.fillWidth: true; from: 0; to: 1; value: root.volumeLevel / 100; onMoved: root.setVolume(value) }
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: 1
-                                Layout.preferredHeight: 116
-                                color: settingsSurface
-                                border.width: 1
-                                border.color: settingsOutline
-                                radius: 10
-                                ColumnLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 14
-                                    spacing: 6
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text { text: root.micMuted ? "󰍭  Microphone muted" : "󰍬  Microphone"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
-                                        Item { Layout.fillWidth: true }
-                                        Button {
-                                            text: root.micMuted ? "Unmute" : "Mute"
-                                            onClicked: root.toggleMicMute()
-                                            contentItem: Text { text: parent.text; color: accent; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                            background: Rectangle { implicitWidth: 58; implicitHeight: 26; color: parent.hovered ? settingsRaised : background; border.width: 1; border.color: settingsOutline; radius: 7 }
-                                        }
-                                    }
-                                    Text { text: Math.round(root.micVolumeLevel) + "%  •  " + root.micName; color: muted; Layout.fillWidth: true; elide: Text.ElideMiddle; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                    Slider { Layout.fillWidth: true; from: 0; to: 1; value: root.micVolumeLevel / 100; onMoved: root.setMicVolume(value) }
-                                }
-                            }
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "Default devices"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
-                            Item { Layout.fillWidth: true }
-                            Button {
-                                text: "󰓃  Open Wiremix"
-                                onClicked: root.run(["wezterm", "-e", "wiremix"])
-                                contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                background: Rectangle { implicitWidth: 112; implicitHeight: 30; color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 8 }
-                            }
-                        }
-
-                        Text { text: "Output"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                        ListView {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 104
-                            clip: true
-                            spacing: 4
-                            model: root.audioSinks
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: parent ? parent.width : 0
-                                height: 38
-                                radius: 9
-                                color: modelData.name === root.defaultSinkName ? settingsRaised : settingsSurface
-                                border.width: modelData.name === root.defaultSinkName ? 1 : 0
-                                border.color: accent
-                                Text { anchors.fill: parent; anchors.margins: 10; text: (modelData.name === root.defaultSinkName ? "●  " : "○  ") + root.deviceLabel(modelData); color: foreground; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9; elide: Text.ElideRight }
-                                MouseArea { anchors.fill: parent; onClicked: root.setDefaultSink(modelData.name) }
-                            }
-                            Text { anchors.centerIn: parent; visible: root.audioSinks.length === 0; text: root.audioSinksLoading ? "Loading output devices..." : root.audioSinksError; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                        }
-
-                        Text { text: "Microphone"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                        ListView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
-                            spacing: 4
-                            model: root.audioSources
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: parent ? parent.width : 0
-                                height: 38
-                                radius: 9
-                                color: modelData.name === root.defaultSourceName ? settingsRaised : settingsSurface
-                                border.width: modelData.name === root.defaultSourceName ? 1 : 0
-                                border.color: accent
-                                Text { anchors.fill: parent; anchors.margins: 10; text: (modelData.name === root.defaultSourceName ? "●  " : "○  ") + root.deviceLabel(modelData); color: foreground; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9; elide: Text.ElideRight }
-                                MouseArea { anchors.fill: parent; onClicked: root.setDefaultSource(modelData.name) }
-                            }
-                            Text { anchors.centerIn: parent; visible: root.audioSources.length === 0; text: root.audioSourcesLoading ? "Loading microphones..." : root.audioSourcesError; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                        }
-                    }
-
-                    ColumnLayout {
-                        spacing: 12
-                        Text { text: "Network"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
-                        Text { text: "Current connection"; color: muted; font.family: "Inter"; font.pixelSize: 11 }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 150
-                             color: settingsSurface
-                             radius: 12
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 16
-                                Text { text: root.networkDetail; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 14 * root.menuFontScale; font.weight: Font.DemiBold }
-                                Text { text: "Interface:  " + (root.networkInterface || "unavailable"); color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                Text { text: "Address:    " + (root.networkIp || "unavailable"); color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                Text { text: "Download:   " + root.networkDownloadMbps.toFixed(1) + " Mbps"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                Text { text: "Upload:     " + root.networkUploadMbps.toFixed(1) + " Mbps"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                            }
-                        }
-                        Button {
-                            text: "Open NetworkManager"
-                            onClicked: root.run(["wezterm", "-e", "nmtui"])
-                            contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                             background: Rectangle { implicitHeight: 34; color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 9 }
-                        }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "Wi-Fi networks"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
-                            Item { Layout.fillWidth: true }
-                            Button {
-                                text: root.networkScanning ? "Scanning..." : "Scan"
-                                enabled: !root.networkScanning
-                                onClicked: root.scanNetworks()
-                                contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                 background: Rectangle { implicitWidth: 58; implicitHeight: 26; color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 8 }
-                            }
-                        }
-                        ListView {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 180
-                            clip: true
-                            spacing: 4
-                            model: root.networkDevices
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: parent ? parent.width : 0
-                                height: 36
-                                 color: modelData.active ? settingsRaised : settingsSurface
-                                 radius: 10
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 10
-                                    Text { text: modelData.active ? "●" : "○"; color: modelData.active ? accent : muted; font.pixelSize: 10 }
-                                    Text { text: modelData.ssid; color: foreground; Layout.fillWidth: true; elide: Text.ElideRight; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                    Text { text: modelData.signal + "%  " + modelData.security; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                }
-                                MouseArea { anchors.fill: parent; onClicked: root.connectNetwork(modelData.ssid) }
-                            }
-                            Text {
-                                anchors.centerIn: parent
-                                visible: !root.networkScanning && root.networkDevices.length === 0
-                                text: "No networks found"
-                                color: muted
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 10
-                            }
-                        }
-                        Item { Layout.fillHeight: true }
-                    }
-
-                    ColumnLayout {
-                        spacing: 12
-                        Text { text: "Bluetooth"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
-                        Text { text: "Device management"; color: muted; font.family: "Inter"; font.pixelSize: 11 }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 90
-                                 color: settingsSurface
-                                 radius: 10
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 16
-                                Text { text: root.bluetoothDetail; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 13 * root.menuFontScale; font.weight: Font.DemiBold }
-                                Text { text: "Use bluetui for pairing, connecting, and removing devices."; color: muted; wrapMode: Text.Wrap; Layout.fillWidth: true; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                            }
-                        }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "Nearby devices"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
-                            Item { Layout.fillWidth: true }
-                            Button {
-                                text: root.bluetoothScanning ? "Scanning..." : "Scan"
-                                enabled: !root.bluetoothScanning
-                                onClicked: root.refreshBluetoothDevices()
-                                contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                 background: Rectangle { implicitWidth: 58; implicitHeight: 26; color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 8 }
-                            }
-                        }
-                        ListView {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 230
-                            clip: true
-                            spacing: 4
-                            model: root.bluetoothDevices
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: parent ? parent.width : 0
-                                height: 38
-                             color: settingsSurface
-                             radius: 12
-                                ColumnLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 10
-                                    spacing: 1
-                                    Text { text: modelData.name || "Unknown device"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    Text { text: modelData.address; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 8 }
-                                }
-                                MouseArea { anchors.fill: parent; onClicked: root.connectBluetooth(modelData.address) }
-                            }
-                            Text {
-                                anchors.centerIn: parent
-                                visible: !root.bluetoothScanning && root.bluetoothDevices.length === 0
-                                text: "No Bluetooth devices found"
-                                color: muted
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 10
-                            }
-                        }
-                        Button {
-                            text: "Open Bluetui"
-                            onClicked: root.run(["wezterm", "-e", "bluetui"])
-                            contentItem: Text { text: parent.text; color: foreground; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                            background: Rectangle { implicitHeight: 34; color: parent.hovered ? "#252536" : "#171820"; border.width: 1; border.color: "#373b41"; radius: 1 }
-                        }
-                        Item { Layout.fillHeight: true }
-                    }
-
-                    ColumnLayout {
-                        spacing: 12
-                        Text { text: "Displays"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
-                        Text { text: "Choose the primary monitor and manage connected outputs."; color: muted; font.family: "Inter"; font.pixelSize: 11 }
-
-                        ListView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
-                            spacing: 6
-                            model: root.displays
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: parent ? parent.width : 0
-                                height: 78
-                                 radius: 12
-                                 color: modelData.primary ? settingsRaised : settingsSurface
-                                border.width: modelData.primary ? 1 : 0
-                                border.color: accent
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 14
-                                    spacing: 12
-                                    Text { text: modelData.primary ? "󰍹" : "󰹙"; color: modelData.primary ? accent : muted; font.pixelSize: 22 }
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 2
-                                        Text { text: modelData.name + (modelData.primary ? "  •  Primary" : ""); color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
-                                        Text { text: modelData.mode + "  •  " + modelData.refresh + " Hz"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                    }
-                                    Button {
-                                        text: modelData.primary ? "Primary" : "Set primary"
-                                        enabled: !modelData.primary
-                                        onClicked: root.setPrimaryDisplay(modelData.name)
-                                        contentItem: Text { text: parent.text; color: parent.enabled ? foreground : muted; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                        background: Rectangle { implicitWidth: 82; implicitHeight: 28; color: parent.hovered ? "#373b41" : "#171820"; border.width: 1; border.color: "#373b41"; radius: 1 }
-                                    }
-                                    ComboBox {
-                                        Layout.preferredWidth: 170
-                                        Layout.preferredHeight: 30
-                                        model: modelData.modes
-                                        textRole: "label"
-                                        currentIndex: Math.max(0, modelData.modes.findIndex(option => option.selected))
-                                        contentItem: Text {
-                                            leftPadding: 12
-                                            rightPadding: 28
-                                            text: parent.currentText
-                                            color: foreground
-                                            elide: Text.ElideRight
-                                            verticalAlignment: Text.AlignVCenter
-                                            font.family: "JetBrains Mono"
-                                            font.pixelSize: 9
-                                        }
-                                        indicator: Text {
-                                            x: parent.width - width - 10
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            text: "󰅀"
-                                            color: accent
-                                            font.pixelSize: 13
-                                        }
-                                        background: Rectangle {
-                                            color: parent.hovered ? "#252536" : "#171820"
-                                            border.width: 1
-                                            border.color: parent.activeFocus ? accent : "#373b41"
-                                            radius: 8
-                                        }
-                                        onActivated: index => {
-                                            const option = modelData.modes[index]
-                                            root.setDisplayMode(modelData.name, option.mode, option.refresh)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Text {
-                            visible: root.displays.length === 0
-                            text: "No connected displays found"
-                            color: muted
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 10
-                        }
-                    }
-
-                    ColumnLayout {
-                        spacing: 12
-                        Text { text: "Appearance"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
-                        Text { text: "Tune the spatial rhythm of your desktop."; color: muted; font.family: "Inter"; font.pixelSize: 11 }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { text: "Icon theme"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                            Item { Layout.fillWidth: true }
-                            ComboBox {
-                                Layout.preferredWidth: 170
-                                model: ["Papirus-Dark", "Papirus", "Adwaita", "hicolor"]
-                                 currentIndex: 0
-                                 contentItem: Text { leftPadding: 12; rightPadding: 28; text: parent.currentText; color: foreground; verticalAlignment: Text.AlignVCenter; font.family: "Inter"; font.pixelSize: 10 }
-                                 indicator: Text { x: parent.width - width - 10; anchors.verticalCenter: parent.verticalCenter; text: "⌄"; color: accent; font.pixelSize: 14 }
-                                 background: Rectangle { color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: parent.activeFocus ? accent : settingsOutline; radius: 9 }
-                                 onActivated: root.setIconTheme(currentText)
-                            }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 92
-                             color: settingsSurface
-                            border.width: 1
-                            border.color: "#373b41"
-                            radius: 8
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 6
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Window gap"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: root.windowGap + " px"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                }
-                                Slider {
-                                    Layout.fillWidth: true
-                                    from: 0; to: 32; stepSize: 1
-                                    value: root.windowGap
-                                    onMoved: root.setWindowGap(value)
-                                    background: Rectangle { x: 0; y: parent.topPadding + parent.availableHeight / 2 - height / 2; width: parent.availableWidth; height: 4; radius: 2; color: "#373b41"; Rectangle { width: parent.width * (parent.parent.value - parent.parent.from) / (parent.parent.to - parent.parent.from); height: parent.height; radius: 2; color: accent } }
-                                    handle: Rectangle { x: parent.leftPadding + parent.visualPosition * (parent.availableWidth - width); y: parent.topPadding + parent.availableHeight / 2 - height / 2; implicitWidth: 14; implicitHeight: 14; radius: 7; color: foreground; border.width: 3; border.color: accent }
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 92
-                             color: settingsSurface
-                            border.width: 1
-                            border.color: "#373b41"
-                            radius: 8
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 6
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Border width"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: root.borderWidth + " px"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                }
-                                Slider {
-                                    Layout.fillWidth: true
-                                    from: 0; to: 8; stepSize: 1
-                                    value: root.borderWidth
-                                    onMoved: root.setBorderWidth(value)
-                                    background: Rectangle { x: 0; y: parent.topPadding + parent.availableHeight / 2 - height / 2; width: parent.availableWidth; height: 4; radius: 2; color: "#373b41"; Rectangle { width: parent.width * (parent.parent.value - parent.parent.from) / (parent.parent.to - parent.parent.from); height: parent.height; radius: 2; color: accent } }
-                                    handle: Rectangle { x: parent.leftPadding + parent.visualPosition * (parent.availableWidth - width); y: parent.topPadding + parent.availableHeight / 2 - height / 2; implicitWidth: 14; implicitHeight: 14; radius: 7; color: foreground; border.width: 3; border.color: accent }
-                                }
-                            }
-                        }
-
-                        Text { text: "Changes apply immediately and persist for the next bspwm session."; color: muted; wrapMode: Text.Wrap; Layout.fillWidth: true; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 132
-                             color: settingsSurface
-                            border.width: 1
-                            border.color: "#373b41"
-                            radius: 8
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 7
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Compositor"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
-                                    Item { Layout.fillWidth: true }
-                                    Switch { checked: root.compositorEnabled; onToggled: root.toggleCompositor(checked) }
-                                }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Panel height"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: root.panelHeight + " px"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                }
-                                Slider { Layout.fillWidth: true; from: 24; to: 48; stepSize: 1; value: root.panelHeight; onMoved: root.setPanelHeight(value) }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "UI scale"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: root.menuFontScale.toFixed(1) + "x"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                }
-                                Slider { Layout.fillWidth: true; from: 0.9; to: 1.5; stepSize: 0.1; value: root.menuFontScale; onMoved: root.setMenuFontScale(value) }
-                            }
-                        }
-                        Item { Layout.fillHeight: true }
-                    }
-
-                    ColumnLayout {
-                        spacing: 12
-                        Text { text: "Session"; color: foreground; font.family: "Inter"; font.pixelSize: 20 * root.menuFontScale; font.weight: Font.DemiBold }
-                        Text { text: "Power and session controls."; color: muted; font.family: "Inter"; font.pixelSize: 11 }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            Repeater {
-                                model: [
-                                    { icon: "󰌾", label: "Lock", action: "lock" },
-                                    { icon: "󰑓", label: "Reload desktop", action: "reload" },
-                                    { icon: "󰐥", label: "Power options", action: "power" }
-                                ]
-                                delegate: Button {
-                                    required property var modelData
-                                    Layout.fillWidth: true
-                                    Layout.preferredWidth: 1
-                                    implicitHeight: 68
-                                    onClicked: {
-                                        if (modelData.action === "lock")
-                                            root.lockScreen()
-                                        else if (modelData.action === "reload")
-                                            root.run(["sh", "-c", "$HOME/.config/bspwm/scripts/reload.sh"])
-                                        else
-                                            root.openPowerMenu()
-                                    }
-                                    contentItem: ColumnLayout {
-                                        spacing: 3
-                                        Text { Layout.alignment: Qt.AlignHCenter; text: modelData.icon; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 18 }
-                                        Text { Layout.alignment: Qt.AlignHCenter; text: modelData.label; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                    }
-                                    background: Rectangle { color: parent.hovered ? settingsRaised : settingsSurface; border.width: 1; border.color: settingsOutline; radius: 9 }
-                                }
-                            }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 118
-                             color: settingsSurface
-                            border.width: 1
-                            border.color: "#373b41"
-                            radius: 8
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 6
-                                Text { text: "Hardware"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Brightness"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: root.brightnessAvailable ? Math.round(root.brightnessLevel) + "%" : "Unavailable"; color: root.brightnessAvailable ? accent : muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                }
-                                Slider { Layout.fillWidth: true; enabled: root.brightnessAvailable; opacity: enabled ? 1 : 0.35; from: 5; to: 100; value: root.brightnessLevel; onMoved: root.setBrightness(value) }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Touchpad"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 10 }
-                                    Item { Layout.fillWidth: true }
-                                    Text { visible: !root.touchpadAvailable; text: "Unavailable"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                    Switch { visible: root.touchpadAvailable; checked: root.touchpadEnabled; onClicked: root.toggleTouchpad(checked) }
-                                }
-                            }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 142
-                            color: settingsSurface
-                            border.width: 1
-                            border.color: settingsOutline
-                            radius: 8
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                spacing: 5
-                                Text { text: "Keyboard repeat"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.menuFontScale }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Delay"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: root.keyboardRepeatDelay + " ms"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                }
-                                Slider { Layout.fillWidth: true; from: 150; to: 1000; stepSize: 10; value: root.keyboardRepeatDelay; onMoved: root.setKeyboardRepeat(value, root.keyboardRepeatRate) }
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text { text: "Rate"; color: foreground; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: root.keyboardRepeatRate + " / sec"; color: muted; font.family: "JetBrains Mono"; font.pixelSize: 9 }
-                                }
-                                Slider { Layout.fillWidth: true; from: 10; to: 60; stepSize: 1; value: root.keyboardRepeatRate; onMoved: root.setKeyboardRepeat(root.keyboardRepeatDelay, value) }
-                            }
-                        }
-                        Item { Layout.fillHeight: true }
-                    }
-                }
-            }
-        }
         }
     }
 

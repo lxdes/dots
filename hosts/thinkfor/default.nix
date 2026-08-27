@@ -26,6 +26,7 @@
     ../../modules/system/fonts.nix
     ../../modules/system/git.nix
     ../../modules/system/icons.nix
+    ../../modules/system/quickshell.nix
     ../../modules/system/screenshot.nix
     ../../modules/terminals/wezterm.nix
   ];

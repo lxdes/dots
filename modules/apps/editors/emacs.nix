@@ -40,10 +40,6 @@
     pkgs.black
     pkgs.lua-language-server
     pkgs.nixd
-    (pkgs.python3.withPackages (pythonPackages: with pythonPackages; [
-      icalendar
-      python-dateutil
-    ]))
     pkgs.python3Packages.python-lsp-server
     pkgs.python3Packages.grip
     pkgs.rustup

@@ -6,12 +6,17 @@ import tempfile
 import urllib.request
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 try:
     from dateutil.rrule import rruleset, rrulestr
     from icalendar import Calendar
 except ImportError:
-    print('{"configured":false,"error":"Calendar dependencies unavailable","events":[]}')
+    print(
+        '{"configured":false,"error":"Calendar dependencies unavailable",'
+        '"events":[],"cacheAgeSeconds":null,"cacheStale":false}'
+    )
     raise SystemExit(0)
 
 
@@ -19,47 +24,115 @@ URL_FILE = Path.home() / ".config" / "proton-calendar-url"
 CACHE_DIR = Path.home() / ".cache" / "quickshell"
 CACHE_FILE = CACHE_DIR / "agenda.ics"
 CACHE_SECONDS = 15 * 60
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 WINDOW_DAYS = 14
 
 
-def output(configured, error=None, events=None):
+def output(configured, error=None, events=None, cache_age=None, cache_stale=False):
     print(
         json.dumps(
             {
                 "configured": configured,
                 "error": error,
                 "events": events or [],
+                "cacheAgeSeconds": cache_age,
+                "cacheStale": cache_stale,
             },
             separators=(",", ":"),
         )
     )
 
 
-def fetch_calendar(url):
-    CACHE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+def cache_age(now=None):
     try:
-        fresh = datetime.now().timestamp() - CACHE_FILE.stat().st_mtime < CACHE_SECONDS
+        age = (now or datetime.now().timestamp()) - CACHE_FILE.stat().st_mtime
+        return max(0, int(age))
     except OSError:
-        fresh = False
+        return None
+
+
+def read_cache():
+    with CACHE_FILE.open("rb") as cache:
+        data = cache.read(MAX_RESPONSE_BYTES + 1)
+    if len(data) > MAX_RESPONSE_BYTES:
+        raise ValueError("Cached calendar is too large")
+    return data
+
+
+def valid_calendar_url(url):
+    try:
+        return urlsplit(url).scheme.lower() in {"http", "https"}
+    except ValueError:
+        return False
+
+
+def fetch_calendar(url):
+    if not valid_calendar_url(url):
+        return None, "Calendar URL must use http or https", None, False
+    CACHE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    age = cache_age()
+    fresh = age is not None and age < CACHE_SECONDS
 
     if fresh:
-        return CACHE_FILE.read_bytes(), None
+        try:
+            return read_cache(), None, age, False
+        except (OSError, ValueError):
+            pass
 
+    temporary_name = None
     try:
         request = urllib.request.Request(url, headers={"User-Agent": "quickshell-agenda/1"})
         with urllib.request.urlopen(request, timeout=15) as response:
-            data = response.read()
+            if urlsplit(response.geturl()).scheme.lower() not in {"http", "https"}:
+                raise ValueError("Calendar redirect used an unsupported URL scheme")
+            content_length = response.headers.get("Content-Length")
+            if content_length is not None and int(content_length) > MAX_RESPONSE_BYTES:
+                raise ValueError("Calendar response is too large")
+            data = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(data) > MAX_RESPONSE_BYTES:
+                raise ValueError("Calendar response is too large")
         with tempfile.NamedTemporaryFile(dir=CACHE_DIR, delete=False) as temporary:
-            temporary.write(data)
             temporary_name = temporary.name
+            temporary.write(data)
         os.chmod(temporary_name, 0o600)
         os.replace(temporary_name, CACHE_FILE)
-        return data, None
+        temporary_name = None
+        return data, None, 0, False
     except Exception:
         try:
-            return CACHE_FILE.read_bytes(), "Calendar refresh failed; showing cached events"
-        except OSError:
-            return None, "Unable to fetch calendar"
+            age = cache_age()
+            return (
+                read_cache(),
+                "Calendar refresh failed; showing cached events",
+                age,
+                age is None or age >= CACHE_SECONDS,
+            )
+        except (OSError, ValueError):
+            return None, "Unable to fetch calendar", None, False
+    finally:
+        if temporary_name is not None:
+            try:
+                Path(temporary_name).unlink()
+            except OSError:
+                pass
+
+
+def system_timezone():
+    zone_name = os.environ.get("TZ", "").lstrip(":")
+    if zone_name:
+        try:
+            return ZoneInfo(zone_name)
+        except (ValueError, ZoneInfoNotFoundError):
+            pass
+
+    try:
+        zone_path = Path("/etc/localtime").resolve()
+        marker = "/zoneinfo/"
+        if marker in str(zone_path):
+            return ZoneInfo(str(zone_path).split(marker, 1)[1])
+    except (OSError, ValueError, ZoneInfoNotFoundError):
+        pass
+    return datetime.now().astimezone().tzinfo
 
 
 def as_local_datetime(value, local_tz):
@@ -96,6 +169,25 @@ def recurrence_key(uid, value, local_tz):
     return uid, start.isoformat()
 
 
+def event_duration(component, start, all_day, local_tz):
+    end_property = component.get("dtend")
+    if end_property is not None:
+        end, _ = as_local_datetime(end_property.dt, local_tz)
+        return max(end - start, timedelta(0))
+    duration_property = component.get("duration")
+    if duration_property is not None:
+        duration = duration_property.dt
+        if isinstance(duration, timedelta):
+            return max(duration, timedelta(0))
+    return timedelta(days=1) if all_day else timedelta(0)
+
+
+def event_in_window(start, duration, all_day, now, day_start, window_end):
+    range_start = day_start if all_day else now
+    end = start + duration
+    return start < window_end and (end > range_start or start >= range_start)
+
+
 def labels(start, all_day, today):
     event_date = start.date()
     if event_date == today:
@@ -122,10 +214,14 @@ def event_json(component, start, all_day, today):
     }
 
 
-def parse_events(data):
+def parse_events(data, now=None):
     calendar = Calendar.from_ical(data)
-    local_tz = datetime.now().astimezone().tzinfo
-    now = datetime.now(local_tz)
+    if now is None:
+        local_tz = system_timezone()
+        now = datetime.now(local_tz)
+    else:
+        local_tz = now.tzinfo or system_timezone()
+        now = now.replace(tzinfo=local_tz) if now.tzinfo is None else now.astimezone(local_tz)
     day_start = datetime.combine(now.date(), time.min, tzinfo=local_tz)
     window_end = now + timedelta(days=WINDOW_DAYS)
     today = now.date()
@@ -133,47 +229,58 @@ def parse_events(data):
 
     overrides = {}
     for component in components:
-        recurrence_id = component.get("recurrence-id")
-        if recurrence_id is not None:
-            uid = str(component.get("uid", ""))
-            overrides[recurrence_key(uid, recurrence_id.dt, local_tz)] = component
+        try:
+            recurrence_id = component.get("recurrence-id")
+            if recurrence_id is not None:
+                uid = str(component.get("uid", ""))
+                overrides[recurrence_key(uid, recurrence_id.dt, local_tz)] = component
+        except (AttributeError, TypeError, ValueError):
+            continue
 
     events = []
     for component in components:
-        if str(component.get("status", "")).upper() == "CANCELLED":
-            continue
-        if component.get("recurrence-id") is not None:
-            start, all_day = as_local_datetime(component.decoded("dtstart"), local_tz)
-            if (day_start if all_day else now) <= start < window_end:
-                events.append(event_json(component, start, all_day, today))
-            continue
-
-        start, all_day = as_local_datetime(component.decoded("dtstart"), local_tz)
-        recurrence = component.get("rrule")
-        rdates = property_dates(component, "rdate", local_tz)
-        if recurrence is None and not rdates:
-            if (day_start if all_day else now) <= start < window_end:
-                events.append(event_json(component, start, all_day, today))
-            continue
-
-        occurrences = rruleset()
-        if recurrence is not None:
-            rule = recurrence.to_ical().decode("utf-8")
-            occurrences.rrule(rrulestr(rule, dtstart=start))
-        else:
-            occurrences.rdate(start)
-        for rdate in rdates:
-            occurrences.rdate(rdate)
-        for exdate in property_dates(component, "exdate", local_tz):
-            occurrences.exdate(exdate)
-
-        uid = str(component.get("uid", ""))
-        range_start = day_start if all_day else now
-        for occurrence in occurrences.between(range_start, window_end, inc=True):
-            occurrence, _ = as_local_datetime(occurrence, local_tz)
-            if (uid, occurrence.isoformat()) in overrides:
+        try:
+            if str(component.get("status", "")).upper() == "CANCELLED":
                 continue
-            events.append(event_json(component, occurrence, all_day, today))
+            start, all_day = as_local_datetime(component.decoded("dtstart"), local_tz)
+            duration = event_duration(component, start, all_day, local_tz)
+            if component.get("recurrence-id") is not None:
+                if event_in_window(start, duration, all_day, now, day_start, window_end):
+                    events.append(event_json(component, start, all_day, today))
+                continue
+
+            recurrence = component.get("rrule")
+            rdates = property_dates(component, "rdate", local_tz)
+            if recurrence is None and not rdates:
+                if event_in_window(start, duration, all_day, now, day_start, window_end):
+                    events.append(event_json(component, start, all_day, today))
+                continue
+
+            occurrences = rruleset()
+            if recurrence is not None:
+                rule = recurrence.to_ical().decode("utf-8")
+                occurrences.rrule(rrulestr(rule, dtstart=start))
+            else:
+                occurrences.rdate(start)
+            for rdate in rdates:
+                occurrences.rdate(rdate)
+            for exdate in property_dates(component, "exdate", local_tz):
+                occurrences.exdate(exdate)
+
+            uid = str(component.get("uid", ""))
+            range_start = day_start if all_day else now
+            search_start = range_start - duration
+            for occurrence in occurrences.between(search_start, window_end, inc=True):
+                occurrence, _ = as_local_datetime(occurrence, local_tz)
+                if (uid, occurrence.isoformat()) in overrides:
+                    continue
+                if event_in_window(
+                    occurrence, duration, all_day, now, day_start, window_end
+                ):
+                    events.append(event_json(component, occurrence, all_day, today))
+        except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
+            # A malformed VEVENT should not hide otherwise valid calendar entries.
+            continue
 
     events.sort(key=lambda event: event["start"])
     return events
@@ -188,17 +295,20 @@ def main():
     if not url:
         output(False)
         return
+    if not valid_calendar_url(url):
+        output(True, "Calendar URL must use http or https")
+        return
 
-    data, refresh_error = fetch_calendar(url)
+    data, refresh_error, age, stale = fetch_calendar(url)
     if data is None:
-        output(True, refresh_error)
+        output(True, refresh_error, cache_age=age, cache_stale=stale)
         return
     try:
         events = parse_events(data)
     except Exception:
-        output(True, "Unable to parse calendar")
+        output(True, "Unable to parse calendar", cache_age=age, cache_stale=stale)
         return
-    output(True, refresh_error, events)
+    output(True, refresh_error, events, age, stale)
 
 
 if __name__ == "__main__":

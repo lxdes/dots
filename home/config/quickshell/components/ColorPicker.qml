@@ -15,28 +15,45 @@ Window {
     color: "transparent"
     property string colorHex: root.background
     property bool captureReady: false
-    readonly property string capturePath: "/tmp/quickshell-color-picker-" + Quickshell.processId + ".png"
+    property string errorMessage: ""
+    property real pendingX: 0
+    property real pendingY: 0
+    readonly property string capturePath: {
+        const runtimeDirectory = String(Quickshell.env("XDG_RUNTIME_DIR") || "")
+        const directory = runtimeDirectory.length > 0 ? runtimeDirectory : String(Quickshell.env("HOME")) + "/.cache"
+        return directory + "/quickshell-color-picker-" + Quickshell.processId + ".png"
+    }
 
     onVisibleChanged: {
         if (visible) {
             requestActivate()
             captureReady = false
+            errorMessage = "Capturing screen..."
             screenCapture.command = ["maim", "-u", "-g", width + "x" + height + (x >= 0 ? "+" : "") + x + (y >= 0 ? "+" : "") + y, capturePath]
             screenCapture.running = true
         } else {
+            screenCapture.running = false
+            colorSample.running = false
+            clickSample.running = false
+            sampleTimer.stop()
             root.run(["rm", "-f", capturePath])
         }
     }
 
     Shortcut {
         sequence: "Escape"
+        context: Qt.WindowShortcut
         onActivated: picker.visible = false
     }
 
     Process {
         id: screenCapture
         command: ["maim", "-u", picker.capturePath]
-        onExited: captureReady = true
+        stderr: StdioCollector { id: captureError }
+        onExited: (exitCode, exitStatus) => {
+            captureReady = exitCode === 0
+            errorMessage = exitCode === 0 ? "" : (captureError.text.trim() || "Screen capture failed")
+        }
     }
 
     Process {
@@ -46,10 +63,44 @@ Window {
             id: colorSampleOutput
             onStreamFinished: {
                 const value = colorSampleOutput.text.trim()
-                if (value.length > 0)
+                if (/^#[0-9a-fA-F]{6,8}$/.test(value)) {
                     colorHex = value
+                    errorMessage = ""
+                }
             }
         }
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0)
+                picker.errorMessage = "Unable to sample this pixel"
+        }
+    }
+
+    Process {
+        id: clickSample
+        stdout: StdioCollector {
+            id: clickSampleOutput
+            onStreamFinished: {
+                const value = clickSampleOutput.text.trim()
+                if (!/^#[0-9a-fA-F]{6,8}$/.test(value)) {
+                    picker.errorMessage = "Unable to sample this pixel"
+                    return
+                }
+                picker.colorHex = value
+                picker.root.run(["sh", "-c", "printf '%s' \"$1\" | xclip -selection clipboard && notify-send 'Color copied' \"$1\"", "quickshell-color", value])
+                picker.visible = false
+            }
+        }
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0)
+                picker.errorMessage = "Unable to copy this pixel"
+        }
+    }
+
+    Timer {
+        id: sampleTimer
+        interval: 75
+        repeat: false
+        onTriggered: picker.sampleColor(picker.pendingX, picker.pendingY)
     }
 
     function sampleColor(x, y) {
@@ -57,6 +108,21 @@ Window {
             return
         colorSample.command = ["convert", capturePath, "-crop", "1x1+" + Math.round(x) + "+" + Math.round(y), "-format", "#%[hex:p{0,0}]", "info:"]
         colorSample.running = true
+    }
+
+    function queueSample(x, y) {
+        pendingX = Math.max(0, Math.min(width - 1, Math.round(x)))
+        pendingY = Math.max(0, Math.min(height - 1, Math.round(y)))
+        sampleTimer.restart()
+    }
+
+    function copyPixel(x, y) {
+        if (!captureReady || clickSample.running)
+            return
+        const sampleX = Math.max(0, Math.min(width - 1, Math.round(x)))
+        const sampleY = Math.max(0, Math.min(height - 1, Math.round(y)))
+        clickSample.command = ["convert", capturePath, "-crop", "1x1+" + sampleX + "+" + sampleY, "-format", "#%[hex:p{0,0}]", "info:"]
+        clickSample.running = true
     }
 
     Rectangle {
@@ -72,7 +138,7 @@ Window {
         Text {
             id: colorLabel
             anchors.centerIn: parent
-            text: colorHex
+            text: errorMessage || colorHex
             color: root.foreground
             font.family: "JetBrains Mono"
             font.pixelSize: 14
@@ -83,10 +149,8 @@ Window {
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.CrossCursor
-        onPositionChanged: event => picker.sampleColor(event.x, event.y)
-        onClicked: {
-            root.run(["sh", "-c", "printf '%s' '" + colorHex + "' | xclip -selection clipboard; notify-send 'Color copied' '" + colorHex + "'"])
-            picker.visible = false
-        }
+        enabled: picker.captureReady
+        onPositionChanged: event => picker.queueSample(event.x, event.y)
+        onClicked: event => picker.copyPixel(event.x, event.y)
     }
 }

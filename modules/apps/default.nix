@@ -9,7 +9,6 @@
     ./bolt.nix
     ./motrix.nix
     ./discord.nix
-    ./feishin.nix
     ./protonplus.nix
   ];
 }

@@ -1,7 +1,7 @@
 ;;; modules/ui.el -*- lexical-binding: t; -*-
 
 (setq doom-font
-      (font-spec :family "Iosevka Nerd Font" :size 18)
+      (font-spec :family "Iosevka Nerd Font" :size 17)
       doom-variable-pitch-font
       (font-spec :family "Iosevka Nerd Font")
       doom-theme 'doom-tokyo-night
