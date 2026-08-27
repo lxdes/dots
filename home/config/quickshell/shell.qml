@@ -3686,25 +3686,7 @@ ShellRoot {
                         font.family: "JetBrains Mono"
                         font.pixelSize: 13 * root.menuFontScale
                     }
-                    Button {
-                        text: root.doNotDisturb ? "" : ""
-                        Accessible.name: root.doNotDisturb ? "Disable do not disturb" : "Enable do not disturb"
-                        onClicked: root.doNotDisturb = !root.doNotDisturb
-                        contentItem: Text {
-                            text: parent.text
-                            color: foreground
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 14 * root.menuFontScale
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                        background: Rectangle {
-                            radius: 7
-                            color: parent.hovered ? "#252536" : "#171820"
-                            border.width: 1
-                            border.color: "#373b41"
-                        }
-                    }
+
                 }
 
                 Button {
