@@ -16,7 +16,7 @@ PopupWindow {
     readonly property color surface: shellRoot.settingsSurface
     readonly property color raised: shellRoot.settingsRaised
     readonly property color outline: shellRoot.settingsOutline
-    readonly property real fontScale: shellRoot.menuFontScale
+    readonly property real fontScale: shellRoot.uiFontScale
 
     visible: false
     anchor.window: barWindow

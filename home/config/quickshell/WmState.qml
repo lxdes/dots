@@ -34,8 +34,13 @@ Singleton {
             })
         }
         if (desktops.length > 0) {
-            workspaces = desktops
             activeDesktop = focusedDesktop
+            const structureChanged = workspaces.length !== desktops.length || desktops.some((desktop, index) => {
+                const current = workspaces[index]
+                return !current || current.name !== desktop.name || current.occupied !== desktop.occupied || current.urgent !== desktop.urgent
+            })
+            if (structureChanged)
+                workspaces = desktops
         }
     }
 

@@ -22,6 +22,10 @@ ShellRoot {
     readonly property color settingsRaised: Qt.lighter(settingsSurface, 1.16)
     readonly property color settingsOutline: Qt.lighter(background, 1.34)
     property real menuScale: 1.0
+    Behavior on menuScale {
+        enabled: !root.reducedMotion
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
     readonly property string configDirectory: {
         let directory = String(Quickshell.shellDir || "")
         if (directory.startsWith("file://"))
@@ -29,6 +33,11 @@ ShellRoot {
         return directory
     }
     property real menuFontScale: 1.2
+    Behavior on menuFontScale {
+        enabled: !root.reducedMotion
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
+    property alias uiFontScale: root.menuFontScale
     readonly property real displayFontScale: menuFontScale / 1.2
     property int panelHeight: 32
     readonly property int effectivePanelHeight: Math.round(panelHeight * menuScale)
@@ -42,7 +51,7 @@ ShellRoot {
     property string activeTitle: WmState.activeTitle
     readonly property var defaultSinkAudio: audioService.defaultSinkAudio
     readonly property var defaultSourceAudio: audioService.defaultSourceAudio
-    property string audioStatus: defaultSinkAudio ? (defaultSinkAudio.muted ? "󰝟" : "󰕾") : "󰖁"
+    readonly property string audioStatus: outputMuted ? "" : (volumeLevel < 33 ? "" : (volumeLevel < 67 ? "" : ""))
     property string networkStatus: ""
     property string bluetoothStatus: ""
     property string audioDetail: "Default sink"
@@ -75,6 +84,7 @@ ShellRoot {
     property string publicIp: ""
     property string networkInterface: ""
     property string networkType: ""
+    property int networkSignal: -1
     property string networkIp: ""
     property double networkDownloadMbps: 0
     property double networkUploadMbps: 0
@@ -414,10 +424,18 @@ ShellRoot {
         networkInterface = nextInterface
         networkType = fields.length > 1 ? fields[1] : ""
         networkDetail = fields.length > 2 && fields[2].length > 0 ? fields[2] : "Disconnected"
-        networkStatus = networkInterface.length > 0 ? "󰀂" : "󰤮"
+        networkSignal = fields.length > 4 && !isNaN(Number(fields[4])) ? Number(fields[4]) : -1
+        if (networkInterface.length === 0)
+            networkStatus = "󰤮"
+        else if (networkType === "wifi" || networkType === "802-11-wireless")
+            networkStatus = networkSignal < 0 ? "󰤯" : networkSignal < 20 ? "󰤯" : networkSignal < 40 ? "󰤟" : networkSignal < 60 ? "󰤢" : networkSignal < 80 ? "󰤥" : "󰤨"
+        else if (networkType === "ethernet")
+            networkStatus = "󰀂"
+        else
+            networkStatus = "󰀂"
         networkIp = fields.length > 3 ? fields[3] : ""
         if (networkInterface.length === 0) {
-            networkDownloadMbps = 0
+        networkDownloadMbps = 0
             networkUploadMbps = 0
         }
     }
@@ -574,6 +592,10 @@ ShellRoot {
     function setMenuFontScale(value) {
         menuFontScale = Math.max(0.75, Math.min(2.5, value))
         interfacePersistTimer.restart()
+    }
+
+    function setUiFontScale(value) {
+        setMenuFontScale(value)
     }
 
     function setMenuScale(value) {
@@ -1051,9 +1073,9 @@ ShellRoot {
     }
 
     function closePopups() {
-        if (!popupsReady)
-            return
         volumePopup.visible = false
+        if (typeof legacyVolumePopupWindow !== "undefined")
+            legacyVolumePopupWindow.visible = false
         networkPopup.visible = false
         bluetoothPopup.visible = false
         tailscalePopup.visible = false
@@ -1073,6 +1095,18 @@ ShellRoot {
             layoutPopup.visible = false
         if (typeof quickNotePopup !== "undefined")
             quickNotePopup.visible = false
+    }
+
+    function closeWindows() {
+        closePopups()
+        if (typeof settingsWindow !== "undefined")
+            settingsWindow.visible = false
+        if (typeof launcher !== "undefined")
+            launcher.visible = false
+        if (typeof displayConfirmation !== "undefined")
+            displayConfirmation.visible = false
+        if (typeof polkitWindow !== "undefined")
+            polkitWindow.visible = false
     }
 
     function togglePopup(popup) {
@@ -1721,7 +1755,7 @@ ShellRoot {
 
     Process {
         id: networkMetricsQuery
-        command: ["sh", "-c", "iface=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i==\"dev\") {print $(i+1); exit}}'); [ -z \"$iface\" ] && iface=$(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | awk -F: '$3==\"connected\" && $1!=\"lo\" {print $1; exit}'); type=$(nmcli -g GENERAL.TYPE device show \"$iface\" 2>/dev/null | head -n1); connection=$(nmcli -g GENERAL.CONNECTION device show \"$iface\" 2>/dev/null | head -n1); ip=$(nmcli -g IP4.ADDRESS device show \"$iface\" 2>/dev/null | cut -d/ -f1 | head -n1); rx=0; tx=0; [ -n \"$iface\" ] && rx=$(cat /sys/class/net/\"$iface\"/statistics/rx_bytes 2>/dev/null || printf 0); [ -n \"$iface\" ] && tx=$(cat /sys/class/net/\"$iface\"/statistics/tx_bytes 2>/dev/null || printf 0); printf '%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n' \"$iface\" \"$type\" \"$connection\" \"$ip\" \"$connection\" \"$rx\" \"$tx\""]
+        command: ["sh", "-c", "iface=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i==\"dev\") {print $(i+1); exit}}'); [ -z \"$iface\" ] && iface=$(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | awk -F: '$3==\"connected\" && $1!=\"lo\" {print $1; exit}'); type=$(nmcli -g GENERAL.TYPE device show \"$iface\" 2>/dev/null | head -n1); connection=$(nmcli -g GENERAL.CONNECTION device show \"$iface\" 2>/dev/null | head -n1); ip=$(nmcli -g IP4.ADDRESS device show \"$iface\" 2>/dev/null | cut -d/ -f1 | head -n1); signal=$(nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1==\"*\" {print $2; exit}'); rx=0; tx=0; [ -n \"$iface\" ] && rx=$(cat /sys/class/net/\"$iface\"/statistics/rx_bytes 2>/dev/null || printf 0); [ -n \"$iface\" ] && tx=$(cat /sys/class/net/\"$iface\"/statistics/tx_bytes 2>/dev/null || printf 0); printf '%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n' \"$iface\" \"$type\" \"$connection\" \"$ip\" \"$signal\" \"$rx\" \"$tx\""]
         running: true
         stdout: StdioCollector {
             id: networkMetricsOutput
@@ -1969,7 +2003,7 @@ ShellRoot {
                             width: 9.4 * root.menuScale
                             height: 9.4 * root.menuScale
                             radius: 1
-                            color: modelData.active ? foreground : (modelData.urgent ? "#f38ba8" : "transparent")
+                            color: root.activeDesktop === modelData.name ? foreground : (modelData.urgent ? "#f38ba8" : "transparent")
                             border.width: 0
 
                             Text {
@@ -2000,7 +2034,8 @@ ShellRoot {
             Text {
                 Layout.fillWidth: true
                 Layout.leftMargin: 8 * root.menuScale
-                text: activeTitle.length > 48 ? activeTitle.slice(0, 48) + "..." : (activeTitle || "Desktop")
+                Layout.maximumWidth: Math.max(0, Math.min(360 * root.menuScale, bar.width / 2 - clock.width / 2 - 16 * root.menuScale - x - 8 * root.menuScale))
+                text: activeTitle || "Desktop"
                 color: foreground
                 elide: Text.ElideRight
                 font.family: "JetBrains Mono"
@@ -2010,7 +2045,7 @@ ShellRoot {
 
             RowLayout {
                 Layout.rightMargin: 8 * root.menuScale
-                spacing: (bar.width < 1000 * root.menuScale ? 14 : 24) * root.menuScale
+                spacing: 20 * root.menuScale
 
 
 
@@ -2075,8 +2110,10 @@ ShellRoot {
                 Text {
                     text: audioStatus
                     color: foreground
-                    font.family: "JetBrains Mono"
+                    font.family: "Symbols Nerd Font Mono"
                     font.pixelSize: 16 * root.displayFontScale
+                    Layout.minimumWidth: 20 * root.menuScale
+                    horizontalAlignment: Text.AlignHCenter
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: root.outputMuted ? "Audio muted" : "Audio " + Math.round(root.volumeLevel) + " percent"
@@ -2100,10 +2137,13 @@ ShellRoot {
                 }
 
                 Text {
+                    visible: bar.width >= 850 * root.menuScale
                     text: networkStatus
                     color: foreground
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 16 * root.displayFontScale
+                    font.family: "Symbols Nerd Font Mono"
+                    font.pixelSize: 13 * root.displayFontScale
+                    Layout.minimumWidth: 20 * root.menuScale
+                    horizontalAlignment: Text.AlignHCenter
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: "Network " + root.networkDetail
@@ -2118,10 +2158,13 @@ ShellRoot {
                 }
 
                 Text {
+                    visible: bar.width >= 1000 * root.menuScale
                     text: bluetoothStatus
                     color: foreground
                     font.family: "JetBrains Mono"
                     font.pixelSize: 16 * root.displayFontScale
+                    Layout.minimumWidth: 20 * root.menuScale
+                    horizontalAlignment: Text.AlignHCenter
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: "Bluetooth " + root.bluetoothDetail
@@ -2136,10 +2179,13 @@ ShellRoot {
                 }
 
                 Text {
+                    visible: bar.width >= 700 * root.menuScale
                     text: "󰂚"
                     color: foreground
                     font.family: "JetBrains Mono"
                     font.pixelSize: 14 * root.displayFontScale
+                    Layout.minimumWidth: 20 * root.menuScale
+                    horizontalAlignment: Text.AlignHCenter
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: notificationServer.trackedNotifications.values.length + " notifications"
@@ -2188,8 +2234,7 @@ ShellRoot {
     Shortcut {
         sequence: "Escape"
         context: Qt.ApplicationShortcut
-        enabled: calendarPopup.visible || volumePopup.visible || networkPopup.visible || bluetoothPopup.visible || tailscalePopup.visible || exitNodePopup.visible || notificationPopup.visible || layoutPopup.visible
-        onActivated: root.closePopups()
+        onActivated: root.closeWindows()
     }
 
     Window {
@@ -2392,7 +2437,7 @@ ShellRoot {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             font.family: "JetBrains Mono"
-                            font.pixelSize: 9 * root.menuFontScale
+                            font.pixelSize: 9 * root.uiFontScale
                             font.weight: Font.DemiBold
                         }
                         background: Rectangle {

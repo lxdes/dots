@@ -58,7 +58,7 @@ PopupWindow {
                     text: shellRoot.operationErrorTitle
                     color: shellRoot.foreground
                     font.family: "Noto Sans"
-                    font.pixelSize: 11 * shellRoot.menuFontScale
+                    font.pixelSize: 11 * shellRoot.uiFontScale
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
@@ -67,7 +67,7 @@ PopupWindow {
                     text: shellRoot.operationErrorMessage
                     color: shellRoot.muted
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 8 * shellRoot.menuFontScale
+                    font.pixelSize: 8 * shellRoot.uiFontScale
                     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                     maximumLineCount: 3
                     elide: Text.ElideRight

@@ -17,7 +17,7 @@ Window {
     readonly property color surface: root.settingsSurface
     readonly property color raised: root.settingsRaised
     readonly property color outline: root.settingsOutline
-    readonly property real fontScale: root.menuFontScale
+    readonly property real fontScale: root.uiFontScale
 
     visible: false
     title: "Settings"
@@ -33,6 +33,23 @@ Window {
     }
     x: root.centerX(width)
     y: root.centerY(height)
+
+    Behavior on width {
+        enabled: !window.root.reducedMotion
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
+    Behavior on height {
+        enabled: !window.root.reducedMotion
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
+    Behavior on x {
+        enabled: !window.root.reducedMotion
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
+    Behavior on y {
+        enabled: !window.root.reducedMotion
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
 
     onVisibleChanged: if (visible) requestActivate()
 
@@ -221,6 +238,7 @@ Window {
             text: parent.title
             font.pixelSize: 22 * window.fontScale
             font.weight: Font.DemiBold
+            wrapMode: Text.Wrap
         }
         DataText {
             Layout.fillWidth: true
@@ -933,9 +951,9 @@ Window {
                                 Layout.fillWidth: true
                                 UiText { text: "Text scale" }
                                 Item { Layout.fillWidth: true }
-                                DataText { text: root.menuFontScale.toFixed(2) + "x"; color: window.accent }
+                                DataText { text: root.uiFontScale.toFixed(2) + "x"; color: window.accent }
                             }
-                            UiSlider { Layout.fillWidth: true; from: 0.75; to: 2.5; stepSize: 0.05; value: root.menuFontScale; onMoved: root.setMenuFontScale(value) }
+                            UiSlider { Layout.fillWidth: true; from: 0.75; to: 2.5; stepSize: 0.05; value: root.uiFontScale; onMoved: root.setUiFontScale(value) }
                             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: window.outline }
                             RowLayout {
                                 Layout.fillWidth: true

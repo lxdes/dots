@@ -58,7 +58,7 @@ Window {
                 text: "Join " + dialog.ssid
                 color: shellRoot.foreground
                 font.family: "Noto Sans"
-                font.pixelSize: 15 * shellRoot.menuFontScale
+                font.pixelSize: 15 * shellRoot.uiFontScale
                 font.weight: Font.DemiBold
                 elide: Text.ElideMiddle
             }
@@ -67,7 +67,7 @@ Window {
                 text: "Enter the network password. It will be stored by NetworkManager."
                 color: shellRoot.muted
                 font.family: "JetBrains Mono"
-                font.pixelSize: 8 * shellRoot.menuFontScale
+                font.pixelSize: 8 * shellRoot.uiFontScale
                 wrapMode: Text.Wrap
             }
             TextField {

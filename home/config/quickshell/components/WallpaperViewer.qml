@@ -42,7 +42,7 @@ Window {
                     text: "Wallpapers"
                     color: root.foreground
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 18 * root.menuFontScale
+                    font.pixelSize: 18 * root.uiFontScale
                     font.weight: Font.DemiBold
                 }
                 Item { Layout.fillWidth: true }
