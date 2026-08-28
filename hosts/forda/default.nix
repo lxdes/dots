@@ -8,7 +8,6 @@
     ../../home.nix
     ../../modules/apps/bolt.nix
     ../../modules/apps/discord.nix
-    ../../modules/apps/feishin.nix
     ../../modules/apps/localsend.nix
     ../../modules/apps/motrix.nix
     ../../modules/apps/protonplus.nix
@@ -19,7 +18,7 @@
     ../../modules/cli/opencode.nix
     ../../modules/cli/vm-curator.nix
     ../../modules/cli/wiremix.nix
-    ../../modules/editors/emacs.nix
+    ../../modules/apps/editors/emacs.nix
     ../../modules/shells/zsh.nix
     ../../modules/system/audio.nix
     ../../modules/system/cursor.nix

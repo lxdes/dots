@@ -51,7 +51,7 @@
  :lang
  sh
  docker
- (json +lsp)
+ json
  markdown
  (nix +tree-sitter +lsp)
  toml
