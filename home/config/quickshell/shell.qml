@@ -81,6 +81,21 @@ ShellRoot {
     property string bestExitNode: ""
     property string activeExitNodeName: ""
     property string activeExitNodeAddress: ""
+    property real lastWallpaperUpdate: 0
+    property real lastTailscaleUpdate: 0
+    property real lastExitConfigUpdate: 0
+    property real lastPublicIpUpdate: 0
+    property real lastAudioSinksUpdate: 0
+    property real lastAudioSourcesUpdate: 0
+    property real lastNetworkDevicesUpdate: 0
+    property real lastBluetoothUpdate: 0
+    property real lastBatteryUpdate: 0
+    property real lastActiveWindowUpdate: 0
+    property real lastDisplayUpdate: 0
+    property real lastAgendaUpdate: 0
+    property real lastPrivacyUpdate: 0
+    property real lastMetricsUpdate: 0
+    property real lastNetworkMetricsUpdate: 0
     property string publicIp: ""
     property string networkInterface: ""
     property string networkType: ""
@@ -233,6 +248,8 @@ ShellRoot {
     }
 
     function updateBspwm(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.split("\n").map(field => field.trim())
         if (fields.length > 0 && fields[0].length > 0)
             activeDesktop = fields[0]
@@ -345,6 +362,8 @@ ShellRoot {
     }
 
     function updateWorkspaces(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const sections = output.split("\n---\n")
         const names = sections.length > 0 ? sections[0].trim().split("\n").filter(name => name.length > 0) : []
         const occupied = sections.length > 1 ? sections[1].trim().split("\n") : []
@@ -376,17 +395,23 @@ ShellRoot {
     }
 
     function updateBattery(output) {
+        root.lastBatteryUpdate = Date.now()
+        root.lastBatteryUpdate -= root.lastBatteryUpdate
         const fields = output.trim().split("\n")
         batteryCapacity = fields.length > 0 && !isNaN(Number(fields[0])) ? Number(fields[0]) : -1
         batteryStatus = fields.length > 1 ? fields[1] : ""
     }
 
     function updateActiveTitle(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const title = output.trim()
         activeTitle = title.length > 0 ? title : "Desktop"
     }
 
     function updateStatus(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.trim().split("\n")
         audioStatus = fields.length > 0 ? fields[0].trim() : ""
         outputMuted = fields.length > 7 && fields[7].trim() === "yes"
@@ -399,6 +424,8 @@ ShellRoot {
     }
 
     function updateNetworkMetrics(output) {
+        root.lastNetworkMetricsUpdate = Date.now()
+        root.lastNetworkMetricsUpdate -= root.lastNetworkMetricsUpdate
         const fields = output.trim().split("\n")
         const nextInterface = fields.length > 0 ? fields[0] : ""
         if (nextInterface !== networkInterface) {
@@ -640,6 +667,8 @@ ShellRoot {
     }
 
     function updateHardwareSettings(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.split("\n")
         brightnessAvailable = fields.length > 0 && fields[0].length > 0 && !isNaN(Number(fields[0]))
         if (brightnessAvailable)
@@ -659,6 +688,8 @@ ShellRoot {
     }
 
     function updateAppearanceSettings(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.trim().split("\n")
         if (fields.length > 0 && fields[0].length > 0)
             currentIconTheme = fields[0]
@@ -667,6 +698,8 @@ ShellRoot {
     }
 
     function updateGtkThemes(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const themes = output.trim().split("\n").filter(theme => theme.length > 0)
         if (themes.indexOf(currentGtkTheme) === -1)
             themes.unshift(currentGtkTheme)
@@ -753,6 +786,8 @@ ShellRoot {
     }
 
     function updateWifiState(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.trim().split("\n")
         wifiEnabled = fields.length > 0 && fields[0] === "enabled"
         wifiDevice = fields.length > 1 ? fields[1] : ""
@@ -764,6 +799,8 @@ ShellRoot {
     }
 
     function updateVpnProfiles(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const profiles = []
         for (const line of output.trim().split("\n")) {
             const fields = line.split("\t")
@@ -795,6 +832,8 @@ ShellRoot {
     }
 
     function updateDisplays(output) {
+        root.lastDisplayUpdate = Date.now()
+        root.lastDisplayUpdate -= root.lastDisplayUpdate
         const result = []
         for (const line of output.trim().split("\n")) {
             const fields = line.split("\t")
@@ -897,6 +936,8 @@ ShellRoot {
     }
 
     function updateMicStatus(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.trim().split("\n")
         if (!micVolumeAdjusting && fields.length > 0 && !isNaN(Number(fields[0])))
             micVolumeLevel = Number(fields[0])
@@ -906,6 +947,8 @@ ShellRoot {
     }
 
     function updateAudioDevices(output, isSource) {
+        root.lastAudioSinksUpdate = Date.now()
+        root.lastAudioSinksUpdate -= root.lastAudioSinksUpdate
         try {
             const devices = JSON.parse(output)
             if (!Array.isArray(devices))
@@ -939,6 +982,8 @@ ShellRoot {
     }
 
     function updateBluetoothDevices(output) {
+        root.lastBluetoothUpdate = Date.now()
+        root.lastBluetoothUpdate -= root.lastBluetoothUpdate
         const devices = []
         const lines = output.trim().split("\n")
         if (lines.length > 0 && lines[0].startsWith("@adapter\t")) {
@@ -966,6 +1011,8 @@ ShellRoot {
     }
 
     function updateNetworkDevices(output) {
+        root.lastNetworkDevicesUpdate = Date.now()
+        root.lastNetworkDevicesUpdate -= root.lastNetworkDevicesUpdate
         const bySsid = {}
         for (const line of output.trim().split("\n")) {
             const fields = splitNmcliFields(line)
@@ -987,6 +1034,8 @@ ShellRoot {
     }
 
     function updateWifiProfiles(output) {
+        root.lastNetworkDevicesUpdate = Date.now()
+        root.lastNetworkDevicesUpdate -= root.lastNetworkDevicesUpdate
         const profiles = {}
         for (const line of output.trim().split("\n")) {
             const fields = line.split("\t")
@@ -1126,6 +1175,8 @@ ShellRoot {
     }
 
     function updateActiveWindow(id) {
+        root.lastActiveWindowUpdate = Date.now()
+        root.lastActiveWindowUpdate -= root.lastActiveWindowUpdate
         const fields = id.trim().split("\n")
         id = fields[0]
         if (id.length === 0)
@@ -1162,6 +1213,8 @@ ShellRoot {
     }
 
     function updateTailscale(output) {
+        root.lastTailscaleUpdate = Date.now()
+        root.lastTailscaleUpdate -= root.lastTailscaleUpdate
         try {
             const data = JSON.parse(output)
             const peers = data.Peer || {}
@@ -1214,6 +1267,8 @@ ShellRoot {
     }
 
     function updateExitConfig(output) {
+        root.lastExitConfigUpdate = Date.now()
+        root.lastExitConfigUpdate -= root.lastExitConfigUpdate
         try {
             const prefs = JSON.parse(output)
             activeExitNodeAddress = prefs.ExitNodeIP || ""
@@ -1284,6 +1339,8 @@ ShellRoot {
     }
 
     function updateAgenda(output) {
+        root.lastAgendaUpdate = Date.now()
+        root.lastAgendaUpdate -= root.lastAgendaUpdate
         try {
             const data = JSON.parse(output)
             agendaConfigured = data.configured === true
@@ -1296,6 +1353,8 @@ ShellRoot {
     }
 
     function updatePrivacyStatus(output) {
+        root.lastPrivacyUpdate = Date.now()
+        root.lastPrivacyUpdate -= root.lastPrivacyUpdate
         try {
             const data = JSON.parse(output)
             microphoneActive = data.microphoneActive === true
@@ -1309,6 +1368,8 @@ ShellRoot {
     }
 
     function updateSystemMetrics(output) {
+        root.lastMetricsUpdate = Date.now()
+        root.lastMetricsUpdate -= root.lastMetricsUpdate
         try {
             const data = JSON.parse(output)
             cpuPercent = data.cpuPercent === null ? -1 : Number(data.cpuPercent)
