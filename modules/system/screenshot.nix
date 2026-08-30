@@ -8,6 +8,7 @@
     imagemagick
     maim
     xclip
+    jq
   ];
 
 }

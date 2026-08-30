@@ -14,17 +14,13 @@
     curl
     feh
     glib
-    imagemagick
     iproute2
-    jq
     libnotify
-    maim
     networkmanager
     pipewire
     procps
     tailscale
     wiremix
-    xclip
     xprop
     xset
   ];
