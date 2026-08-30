@@ -5,7 +5,7 @@ shell_mode = "auto"
 
 [ui]
 tab_bar_position = "top"
-sidebar_start_collapsed = true
+sidebar_start_collapsed = false
 
 [theme]
 name = "tokyo-night"

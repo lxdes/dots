@@ -130,6 +130,7 @@ ShellRoot {
     property var displays: []
     property string primaryDisplayName: ""
     property bool bluetoothScanning: false
+    property bool bluetoothPopupExplicitlyOpened: false
     property bool networkScanning: false
     property string defaultSinkName: ""
     property string defaultSourceName: ""
@@ -204,6 +205,7 @@ ShellRoot {
 
     Component.onCompleted: {
         popupsReady = true
+        bluetoothStatus = "󰂯"
         refreshDisplays()
         run(["bspc", "rule", "-r", "Launcher"])
         run(["bspc", "rule", "-a", "Launcher", "state=floating", "center=true"])
@@ -1127,6 +1129,7 @@ ShellRoot {
             legacyVolumePopupWindow.visible = false
         networkPopup.visible = false
         bluetoothPopup.visible = false
+        root.bluetoothPopupExplicitlyOpened = false
         tailscalePopup.visible = false
         if (typeof exitNodePopup !== "undefined")
             exitNodePopup.visible = false
@@ -1654,7 +1657,7 @@ ShellRoot {
 
     Process {
         id: bluetoothDevicesQuery
-        command: ["sh", "-c", "controller=$(bluetoothctl show 2>/dev/null); if [ -n \"$controller\" ]; then available=available; powered=$(printf '%s\\n' \"$controller\" | awk '/Powered:/ {print $2; exit}'); else available=unavailable; powered=no; fi; printf '@adapter\\t%s\\t%s\\n' \"$available\" \"$powered\"; [ \"$powered\" = yes ] && bluetoothctl --timeout 8 scan on >/dev/null 2>&1; bluetoothctl devices 2>/dev/null | while read -r _ address name; do info=$(bluetoothctl info \"$address\" 2>/dev/null); connected=$(printf '%s\\n' \"$info\" | awk '/Connected:/ {print $2; exit}'); paired=$(printf '%s\\n' \"$info\" | awk '/Paired:/ {print $2; exit}'); trusted=$(printf '%s\\n' \"$info\" | awk '/Trusted:/ {print $2; exit}'); icon=$(printf '%s\\n' \"$info\" | awk '/Icon:/ {print $2; exit}'); battery=$(printf '%s\\n' \"$info\" | awk '/Battery Percentage:/ {value=$NF; gsub(/[()]/, \"\", value); print value; exit}'); printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$address\" \"$name\" \"${connected:-no}\" \"${paired:-no}\" \"${trusted:-no}\" \"$icon\" \"${battery:--1}\"; done"]
+        command: ["sh", "-c", "controller=$(bluetoothctl show 2>/dev/null); if [ -n \"$controller\" ]; then available=available; powered=$(printf '%s\\n' \"$controller\" | awk '/Powered:/ {print $2; exit}'); else available=unavailable; powered=no; fi; printf '@adapter\\t%s\\t%s\\n' \"$available\" \"$powered\"; bluetoothctl devices 2>/dev/null | while read -r _ address name; do info=$(bluetoothctl info \"$address\" 2>/dev/null); connected=$(printf '%s\\n' \"$info\" | awk '/Connected:/ {print $2; exit}'); paired=$(printf '%s\\n' \"$info\" | awk '/Paired:/ {print $2; exit}'); trusted=$(printf '%s\\n' \"$info\" | awk '/Trusted:/ {print $2; exit}'); icon=$(printf '%s\\n' \"$info\" | awk '/Icon:/ {print $2; exit}'); battery=$(printf '%s\\n' \"$info\" | awk '/Battery Percentage:/ {value=$NF; gsub(/[()]/, \"\", value); print value; exit}'); printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$address\" \"$name\" \"${connected:-no}\" \"${paired:-no}\" \"${trusted:-no}\" \"$icon\" \"${battery:--1}\"; done"]
         stdout: StdioCollector {
             id: bluetoothDevicesOutput
             onStreamFinished: root.updateBluetoothDevices(bluetoothDevicesOutput.text)
@@ -1665,7 +1668,6 @@ ShellRoot {
     Process {
         id: bluetoothSnapshotQuery
         command: ["sh", "-c", "controller=$(bluetoothctl show 2>/dev/null); if [ -n \"$controller\" ]; then available=available; powered=$(printf '%s\\n' \"$controller\" | awk '/Powered:/ {print $2; exit}'); else available=unavailable; powered=no; fi; printf '@adapter\\t%s\\t%s\\n' \"$available\" \"$powered\"; bluetoothctl devices 2>/dev/null | while read -r _ address name; do info=$(bluetoothctl info \"$address\" 2>/dev/null); connected=$(printf '%s\\n' \"$info\" | awk '/Connected:/ {print $2; exit}'); paired=$(printf '%s\\n' \"$info\" | awk '/Paired:/ {print $2; exit}'); trusted=$(printf '%s\\n' \"$info\" | awk '/Trusted:/ {print $2; exit}'); icon=$(printf '%s\\n' \"$info\" | awk '/Icon:/ {print $2; exit}'); battery=$(printf '%s\\n' \"$info\" | awk '/Battery Percentage:/ {value=$NF; gsub(/[()]/, \"\", value); print value; exit}'); printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$address\" \"$name\" \"${connected:-no}\" \"${paired:-no}\" \"${trusted:-no}\" \"$icon\" \"${battery:--1}\"; done"]
-        running: true
         stdout: StdioCollector {
             id: bluetoothSnapshotOutput
             onStreamFinished: root.updateBluetoothDevices(bluetoothSnapshotOutput.text)
@@ -1675,30 +1677,15 @@ ShellRoot {
     Process {
         id: bluetoothMonitor
         command: ["bluetoothctl", "--monitor"]
-        running: true
         stdout: SplitParser {
             onRead: line => bluetoothMonitorRefresh.restart()
         }
         onExited: bluetoothMonitorRestart.restart()
     }
 
-    Timer {
-        id: bluetoothMonitorRefresh
-        interval: 500
-        repeat: false
-        onTriggered: root.refreshBluetoothSnapshot()
-    }
-
-    Timer {
-        id: bluetoothMonitorRestart
-        interval: 1500
-        repeat: false
-        onTriggered: if (!bluetoothMonitor.running) bluetoothMonitor.running = true
-    }
-
     Process {
         id: networkDevicesQuery
-        command: ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "device", "wifi", "list", "--rescan", "yes"]
+        command: ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "device", "wifi", "list"]
         stdout: StdioCollector {
             id: networkDevicesOutput
             onStreamFinished: root.updateNetworkDevices(networkDevicesOutput.text)
@@ -1733,32 +1720,10 @@ ShellRoot {
     Process {
         id: networkMonitor
         command: ["nmcli", "monitor"]
-        running: true
         stdout: SplitParser {
             onRead: line => networkMonitorRefresh.restart()
         }
         onExited: networkMonitorRestart.restart()
-    }
-
-    Timer {
-        id: networkMonitorRefresh
-        interval: 600
-        repeat: false
-        onTriggered: {
-            if (!wifiStateQuery.running)
-                wifiStateQuery.running = true
-            if (!networkMetricsQuery.running)
-                networkMetricsQuery.running = true
-            if (settingsWindow.visible && root.settingsPage === "Network")
-                root.refreshVpnSettings()
-        }
-    }
-
-    Timer {
-        id: networkMonitorRestart
-        interval: 1500
-        repeat: false
-        onTriggered: if (!networkMonitor.running) networkMonitor.running = true
     }
 
     Process {
@@ -2104,6 +2069,8 @@ ShellRoot {
                 font.weight: Font.DemiBold
             }
 
+            Item { Layout.fillWidth: true }
+
             RowLayout {
                 Layout.rightMargin: 8 * root.menuScale
                 spacing: 20 * root.menuScale
@@ -2234,7 +2201,7 @@ ShellRoot {
                         id: bluetoothMouseArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: root.togglePopup(bluetoothPopup)
+                                onClicked: root.togglePopup(bluetoothPopup), root.bluetoothPopupExplicitlyOpened = true
                         onPressAndHold: root.run(["wezterm", "-e", "bluetui"])
                     }
                 }
@@ -3314,7 +3281,7 @@ ShellRoot {
         implicitWidth: Math.min(300 * menuScale, bar.width - 16)
         implicitHeight: Math.min(390 * menuScale, bar.screen.height - bar.height - 12)
 
-        onVisibleChanged: if (visible) root.refreshBluetoothDevices()
+        onVisibleChanged: if (visible && bluetoothPopupExplicitlyOpened) root.refreshBluetoothDevices()
 
         Rectangle {
             anchors.fill: parent
@@ -3461,7 +3428,7 @@ ShellRoot {
 
     PopupWindow {
         id: tailscalePopup
-        visible: false
+        visible: root.tailscaleState === "Running"
         anchor.window: bar
         anchor.rect.x: bar.width - tailscalePopup.implicitWidth - 10
         anchor.rect.y: bar.height + 2

@@ -9,13 +9,11 @@ power_profile=unknown
 : "${SYS_ROOT:=/sys}"
 
 if [ -r "$PROC_ROOT/stat" ]; then
-	sample=$(awk 'NR == 1 { idle=$5+$6; total=0; for (i=2; i<=NF; i++) total+=$i; print idle, total; exit }' "$PROC_ROOT/stat")
-	idle_before=${sample% *}
-	total_before=${sample#* }
-	sleep 0.15
-	sample=$(awk 'NR == 1 { idle=$5+$6; total=0; for (i=2; i<=NF; i++) total+=$i; print idle, total; exit }' "$PROC_ROOT/stat")
-	idle_after=${sample% *}
-	total_after=${sample#* }
+	idle_before=$(awk 'NR == 1 { print $5+$6 }' "$PROC_ROOT/stat")
+	total_before=$(awk 'NR == 1 { total=0; for (i=2; i<=NF; i++) total+=$i; print total }' "$PROC_ROOT/stat")
+	sleep 0.10
+	idle_after=$(awk 'NR == 1 { print $5+$6 }' "$PROC_ROOT/stat")
+	total_after=$(awk 'NR == 1 { total=0; for (i=2; i<=NF; i++) total+=$i; print total }' "$PROC_ROOT/stat")
 	idle_delta=$((idle_after - idle_before))
 	total_delta=$((total_after - total_before))
 	if [ "$total_delta" -gt 0 ]; then

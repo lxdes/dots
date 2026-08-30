@@ -16,7 +16,7 @@ Window {
     height: root.primaryScreen() ? Math.max(1, Math.min(560 * root.menuScale, root.primaryScreen().height - 48)) : 560 * root.menuScale
     property string launchError: ""
 
-    onVisibleChanged: if (visible) focusTimer.restart()
+    onVisibleChanged: if (!visible) search.text = ""
     onActiveChanged: {
         if (active) {
             dismissTimer.stop()
@@ -28,6 +28,7 @@ Window {
 
     function activateLauncher() {
         requestActivate()
+        search.text = ""
         search.forceActiveFocus(Qt.OtherFocusReason)
         if (search.activeFocus)
             search.selectAll()
@@ -42,6 +43,7 @@ Window {
         sequence: "Escape"
         context: Qt.WindowShortcut
         onActivated: {
+            search.text = ""
             root.launcherVisible = false
             launcher.visible = false
         }
@@ -60,6 +62,7 @@ Window {
         repeat: false
         onTriggered: {
             if (!launcher.active) {
+                search.text = ""
                 root.launcherVisible = false
                 launcher.visible = false
             }
@@ -247,14 +250,6 @@ Window {
                 color: "#f38ba8"
                 font.family: "JetBrains Mono"
                 font.pixelSize: 10 * root.panelFontScale
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Text { text: "↑↓  Navigate"; color: root.muted; font.family: "JetBrains Mono"; font.pixelSize: 9 * root.panelFontScale }
-                Text { text: "↵  Launch"; color: root.muted; font.family: "JetBrains Mono"; font.pixelSize: 9 * root.panelFontScale }
-                Item { Layout.fillWidth: true }
-                Text { text: "󰘳  Super + Space"; color: root.accent; font.family: "JetBrains Mono"; font.pixelSize: 9 * root.panelFontScale }
             }
         }
     }
