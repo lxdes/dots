@@ -2403,7 +2403,7 @@ ShellRoot {
         grabFocus: true
         color: "transparent"
         implicitWidth: Math.min(330 * menuScale, bar.width - 16)
-        implicitHeight: Math.min(600 * menuScale, bar.screen.height - bar.height - 12)
+        implicitHeight: 320
 
         Rectangle {
             anchors.fill: parent
@@ -2538,73 +2538,6 @@ ShellRoot {
                             }
                         }
                     }
-                }
-
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: settingsOutline }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text { text: "Upcoming"; color: accent; font.family: "JetBrains Mono"; font.pixelSize: 11; font.weight: Font.DemiBold }
-                    Item { Layout.fillWidth: true }
-                    Button {
-                        id: calendarRefreshButton
-                        implicitWidth: 72
-                        implicitHeight: 30
-                        text: agendaQuery.running ? "Refreshing..." : "Refresh"
-                        enabled: !agendaQuery.running
-                        onClicked: agendaQuery.running = true
-                        contentItem: Text {
-                            text: calendarRefreshButton.text
-                            color: calendarRefreshButton.enabled ? foreground : muted
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 9 * root.menuFontScale
-                        }
-                        background: Rectangle {
-                            radius: 9
-                            color: calendarRefreshButton.down ? accent : (calendarRefreshButton.hovered ? settingsRaised : settingsSurface)
-                            border.width: 1
-                            border.color: calendarRefreshButton.activeFocus || calendarRefreshButton.hovered ? accent : settingsOutline
-                        }
-                    }
-                }
-
-                ListView {
-                    id: agendaList
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    spacing: 5
-                    model: root.agendaEvents
-                    delegate: Rectangle {
-                        required property var modelData
-                        width: agendaList.width
-                        height: 48
-                        radius: 7
-                        color: settingsSurface
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 1
-                                Text { Layout.fillWidth: true; text: modelData.summary; color: foreground; font.family: "Noto Sans"; font.pixelSize: 10 * root.menuFontScale; elide: Text.ElideRight }
-                                Text { Layout.fillWidth: true; text: modelData.localDisplay + (modelData.location ? "  ·  " + modelData.location : ""); color: muted; font.family: "JetBrains Mono"; font.pixelSize: 8 * root.menuFontScale; elide: Text.ElideRight }
-                            }
-                        }
-                    }
-                }
-
-                Text {
-                    visible: root.agendaEvents.length === 0
-                    Layout.fillWidth: true
-                    text: root.agendaError || (root.agendaConfigured ? "No upcoming events" : "Add ~/.config/proton-calendar-url to enable agenda")
-                    color: root.agendaError.length > 0 ? "#f38ba8" : muted
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 9
                 }
             }
         }
