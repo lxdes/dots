@@ -1904,13 +1904,6 @@ ShellRoot {
     }
 
     IpcHandler {
-        target: "mic"
-        function toggle(): void {
-            root.toggleMicMute()
-        }
-    }
-
-    IpcHandler {
         target: "volume"
         function toggle(): void {
             root.togglePopup(volumePopup)
@@ -2142,7 +2135,6 @@ ShellRoot {
                         id: privacyMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: root.toggleMicMute()
                     }
                 }
 
@@ -2321,12 +2313,10 @@ ShellRoot {
                         id: audioMouseArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onClicked: event => {
                             if (event.button === Qt.RightButton)
                                 root.toggleOutputMute()
-                            else if (event.button === Qt.MiddleButton)
-                                root.toggleMicMute()
                             else
                                 root.togglePopup(volumePopup)
                         }

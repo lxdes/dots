@@ -54,9 +54,6 @@ super + shift + w
 super + shift + p
 	qs ipc call colorpicker toggle
 
-super + shift + m
-	qs ipc call mic toggle
-
 super + shift + c
       xcolor -f hex -s clipboard
 
