@@ -659,9 +659,14 @@ ShellRoot {
         layoutActionProcess.running = true
     }
 
+    function syncBspwmPadding(padding) {
+        const pad = Math.max(0, padding)
+        run(["sh", "-c", "bspc config top_padding \"$1\"; for mon in $(bspc query -M --names 2>/dev/null); do bspc config -m \"$mon\" top_padding \"$1\"; done", "sync-padding", String(pad)])
+    }
+
     function setPanelHeight(value) {
         panelHeight = Math.round(value)
-        run(["bspc", "config", "top_padding", String(effectivePanelHeight)])
+        syncBspwmPadding(effectivePanelHeight)
         interfacePersistTimer.restart()
     }
 
@@ -676,7 +681,7 @@ ShellRoot {
 
     function setMenuScale(value) {
         menuScale = Math.max(0.75, Math.min(2.5, value))
-        run(["bspc", "config", "top_padding", String(effectivePanelHeight)])
+        syncBspwmPadding(effectivePanelHeight)
         interfacePersistTimer.restart()
     }
 
@@ -684,7 +689,7 @@ ShellRoot {
         menuScale = scale
         menuFontScale = Math.max(0.75, Math.min(2.5, 1.2 * scale))
         panelHeight = 32
-        run(["bspc", "config", "top_padding", String(effectivePanelHeight)])
+        syncBspwmPadding(effectivePanelHeight)
         interfacePersistTimer.restart()
     }
 
@@ -1429,19 +1434,21 @@ ShellRoot {
     }
 
     Process {
-        command: ["sh", "-c", "state=\"${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/interface-state\"; [ -r \"$state\" ] && cat \"$state\""]
+        command: ["sh", "-c", "state=\"${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/interface-state\"; if [ -r \"$state\" ]; then cat \"$state\"; else dpi=$(xrdb -get Xft.dpi 2>/dev/null || echo 96); res_h=$(xrandr --current 2>/dev/null | awk -F'current ' '/Screen 0:/ { split($2, a, \",\"); split(a[1], dims, \" x \"); print dims[2] }'); if [ \"${dpi:-96}\" -ge 192 ] 2>/dev/null || [ \"${res_h:-1080}\" -ge 2000 ] 2>/dev/null; then printf '32\\n2.4\\n0\\n2.0\\n'; elif [ \"${dpi:-96}\" -ge 144 ] 2>/dev/null || [ \"${res_h:-1080}\" -ge 1400 ] 2>/dev/null; then printf '32\\n1.8\\n0\\n1.5\\n'; else printf '32\\n1.2\\n0\\n1.0\\n'; fi; fi"]
         running: true
         stdout: StdioCollector {
             id: interfaceStateOutput
             onStreamFinished: {
                 const values = interfaceStateOutput.text.trim().split("\n")
+                if (values.length > 0 && !isNaN(Number(values[0])))
+                    root.panelHeight = Math.max(20, Math.min(80, Number(values[0])))
                 if (values.length > 1 && !isNaN(Number(values[1])))
-                    root.menuFontScale = Math.max(0.75, Math.min(2.5, Number(values[1])))
+                    root.menuFontScale = Math.max(0.75, Math.min(3.0, Number(values[1])))
                 if (values.length > 2)
                     root.reducedMotion = values[2] === "1"
                 if (values.length > 3 && !isNaN(Number(values[3])))
-                    root.menuScale = Math.max(0.75, Math.min(2.5, Number(values[3])))
-                root.run(["bspc", "config", "top_padding", String(root.effectivePanelHeight)])
+                    root.menuScale = Math.max(0.75, Math.min(3.0, Number(values[3])))
+                root.syncBspwmPadding(root.effectivePanelHeight)
             }
         }
     }
