@@ -35,6 +35,15 @@ fi
 sudo dnf install -y --allowerasing \
 	xlibre-xserver \
 	xlibre-xf86-input-libinput
+
+if [[ -f /etc/vconsole.conf ]]; then
+	sudo sed -i '/^FONT=/d' /etc/vconsole.conf
+	echo 'FONT="ter-v32n"' | sudo tee -a /etc/vconsole.conf >/dev/null
+else
+	echo 'FONT="ter-v32n"' | sudo tee /etc/vconsole.conf >/dev/null
+fi
+sudo setfont ter-v32n 2>/dev/null || true
+
 sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
 sudo systemctl enable --now tailscaled.service

@@ -10,3 +10,4 @@ mesa-libEGL
 vulkan-loader
 libva
 libva-utils
+terminus-fonts-console
