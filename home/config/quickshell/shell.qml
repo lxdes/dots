@@ -2205,7 +2205,6 @@ ShellRoot {
 
                         Text {
                             anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 1.5 * root.menuScale
                             text: root.trayExpanded ? "󰅂" : "󰅁"
                             color: root.muted
                             font.family: "JetBrains Mono"
