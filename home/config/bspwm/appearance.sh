@@ -26,12 +26,18 @@ border_width=$(awk "BEGIN { printf \"%d\", ($scale * 2) + 0.5 }")
 window_gap=$(awk "BEGIN { printf \"%d\", ($scale * 6) + 0.5 }")
 top_padding=$(awk "BEGIN { printf \"%d\", ($scale * 32) + 0.5 }")
 
-# 3. Apply to bspwm globally and per monitor
+# 3. Apply to bspwm globally, per monitor, and per desktop
 bspc config border_width "$border_width"
 bspc config window_gap "$window_gap"
 bspc config top_padding "$top_padding"
 
-for mon in $(bspc query -M --names 2>/dev/null); do
+for mon in $(bspc query -M 2>/dev/null); do
 	bspc config -m "$mon" top_padding "$top_padding"
 	bspc config -m "$mon" window_gap "$window_gap"
+	bspc config -m "$mon" border_width "$border_width"
+done
+
+for desk in $(bspc query -D 2>/dev/null); do
+	bspc config -d "$desk" top_padding "$top_padding"
+	bspc config -d "$desk" window_gap "$window_gap"
 done
