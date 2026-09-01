@@ -158,9 +158,12 @@ ShellRoot {
     property bool toastClearing: false
     property bool doNotDisturb: false
     readonly property var powerActions: [
+        { icon: "󰌾", label: "Lock", command: ["betterlockscreen", "-l"] },
+        { icon: "󰒲", label: "Suspend", command: ["systemctl", "suspend"] },
+        { icon: "󰤄", label: "Hibernate", command: ["systemctl", "hibernate"] },
         { icon: "󰗼", label: "Logout", command: ["bspc", "quit"] },
-        { icon: "󰐥", label: "Shutdown", command: ["systemctl", "poweroff"] },
         { icon: "󰜉", label: "Reboot", command: ["systemctl", "reboot"] },
+        { icon: "󰐥", label: "Shutdown", command: ["systemctl", "poweroff"] },
         { icon: "󰅖", label: "Cancel", command: null }
     ]
     property int powerIndex: 0
@@ -1476,6 +1479,7 @@ ShellRoot {
             if (exitCode === 0) {
                 root.selectedWallpaper = pendingPath
                 root.run(["notify-send", "Wallpaper applied", pendingPath.split("/").pop()])
+                root.run(["betterlockscreen", "-u", pendingPath])
             } else {
                 root.run(["notify-send", "Wallpaper failed", wallpaperApplyError.text.trim() || "Unable to apply wallpaper"])
             }
@@ -2146,7 +2150,7 @@ ShellRoot {
 
                     Text {
                         anchors.centerIn: parent
-                        text: root.trayExpanded ? "󰅃" : "󰅂"
+                        text: root.trayExpanded ? "󰅂" : "󰅁"
                         color: root.muted
                         font.family: "JetBrains Mono"
                         font.pixelSize: 11 * root.displayFontScale
@@ -3854,7 +3858,7 @@ ShellRoot {
         y: root.centerY(height)
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.BypassWindowManagerHint
         color: "transparent"
-        width: root.primaryScreen() ? Math.max(1, Math.min(560 * menuScale, root.primaryScreen().width - 32)) : 560 * menuScale
+        width: root.primaryScreen() ? Math.max(1, Math.min(720 * menuScale, root.primaryScreen().width - 32)) : 720 * menuScale
         height: 180 * menuScale
 
         onVisibleChanged: {
