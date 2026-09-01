@@ -5,11 +5,8 @@
 ** Initial
 #+BEGIN_SRC bash
 sudo dnf update --refresh
- sudo dnf install git bspwm sxhkd picom polybar rofi zsh bat eza zoxide fastfetch maim nitrogen feh xrandr lxpolkit dunst udiskie brightnessctl
-chsh -s zsh
-git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
-git clone https://github.com/fdellwing/zsh-bat.git $ZSH_CUSTOM/plugins/zsh-bat
+sudo dnf install git bspwm sxhkd picom polybar rofi zsh bat eza zoxide fastfetch maim nitrogen feh xrandr lxpolkit dunst udiskie brightnessctl
+chsh -s $(which zsh)
 #+END_SRC
 
 ** WezTerm

@@ -6,7 +6,7 @@
 
   imports = [
     ../../home.nix
-    ../../modules/editors/emacs.nix
+    ../../modules/apps/editors/emacs.nix
     ../../modules/fm/pcmanfm.nix
     ../../modules/shells/zsh.nix
     ../../modules/system/audio.nix

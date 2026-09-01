@@ -24,54 +24,26 @@
       pkgs = import nixpkgs {
         inherit system;
       };
+      mkHost =
+        host: impure:
+        home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          extraSpecialArgs = {
+            inherit inputs;
+            hostProfile = host;
+            homeManagerImpure = impure;
+          };
+          modules = [
+            ./hosts/${host}
+          ];
+        };
     in
     {
-      homeConfigurations.forda = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-        extraSpecialArgs = {
-          inherit inputs;
-          hostProfile = "forda";
-          homeManagerImpure = false;
-        };
-        modules = [
-          ./hosts/forda
-        ];
-      };
-
-      homeConfigurations.thinkfor = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-        extraSpecialArgs = {
-          inherit inputs;
-          hostProfile = "thinkfor";
-          homeManagerImpure = false;
-        };
-        modules = [
-          ./hosts/thinkfor
-        ];
-      };
-
-      homeConfigurations.vm = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-        extraSpecialArgs = {
-          inherit inputs;
-          hostProfile = "vm";
-          homeManagerImpure = false;
-        };
-        modules = [
-          ./hosts/vm
-        ];
-      };
-
-      homeConfigurations.generic = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-        extraSpecialArgs = {
-          inherit inputs;
-          hostProfile = "generic";
-          homeManagerImpure = true;
-        };
-        modules = [
-          ./hosts/generic
-        ];
+      homeConfigurations = {
+        forda = mkHost "forda" false;
+        thinkfor = mkHost "thinkfor" false;
+        vm = mkHost "vm" false;
+        generic = mkHost "generic" true;
       };
     };
 }

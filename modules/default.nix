@@ -4,7 +4,7 @@
 
 {
   imports = [
-    ./editors/default.nix
+    ./apps/editors/default.nix
     ./shells/default.nix
     ./system/default.nix
     ./terminals/default.nix

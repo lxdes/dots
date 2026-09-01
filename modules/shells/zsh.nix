@@ -46,8 +46,6 @@ in
       export EDITOR="emacs"
       export VISUAL="emacs"
 
-      export TERM=st
-
       autoload -Uz compinit
       if [ "$(date +'%j')" != "$(stat -f '%Sm' -t '%j' ~/.zcompdump 2>/dev/null)" ]; then
         compinit
