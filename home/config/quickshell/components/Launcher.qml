@@ -15,12 +15,25 @@ Window {
     width: root.primaryScreen() ? Math.max(1, Math.min(640 * root.menuScale, root.primaryScreen().width - 32)) : 640 * root.menuScale
     height: root.primaryScreen() ? Math.max(1, Math.min(560 * root.menuScale, root.primaryScreen().height - 48)) : 560 * root.menuScale
     property string launchError: ""
+    property int focusAttempts: 0
 
-    onVisibleChanged: if (!visible) search.text = ""
+    onVisibleChanged: {
+        if (visible) {
+            dismissTimer.stop()
+            search.text = ""
+            activateLauncher()
+        } else {
+            search.text = ""
+            focusTimer.stop()
+            dismissTimer.stop()
+        }
+    }
+
     onActiveChanged: {
         if (active) {
             dismissTimer.stop()
-            focusTimer.restart()
+            search.forceActiveFocus(Qt.OtherFocusReason)
+            search.selectAll()
         } else if (visible) {
             dismissTimer.restart()
         }
@@ -28,10 +41,8 @@ Window {
 
     function activateLauncher() {
         requestActivate()
-        search.text = ""
-        search.forceActiveFocus(Qt.OtherFocusReason)
-        if (search.activeFocus)
-            search.selectAll()
+        focusAttempts = 0
+        focusTimer.restart()
     }
 
     function searchableText(entry) {
@@ -51,17 +62,32 @@ Window {
 
     Timer {
         id: focusTimer
-        interval: 50
-        repeat: false
-        onTriggered: launcher.activateLauncher()
+        interval: 40
+        repeat: true
+        onTriggered: {
+            if (!launcher.visible) {
+                stop()
+                return
+            }
+            launcher.requestActivate()
+            search.forceActiveFocus(Qt.OtherFocusReason)
+            if (search.activeFocus) {
+                search.selectAll()
+                stop()
+            } else {
+                launcher.focusAttempts++
+                if (launcher.focusAttempts >= 8)
+                    stop()
+            }
+        }
     }
 
     Timer {
         id: dismissTimer
-        interval: 100
+        interval: 200
         repeat: false
         onTriggered: {
-            if (!launcher.active) {
+            if (!launcher.active && launcher.visible) {
                 search.text = ""
                 root.launcherVisible = false
                 launcher.visible = false

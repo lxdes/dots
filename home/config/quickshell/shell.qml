@@ -1857,12 +1857,12 @@ ShellRoot {
     IpcHandler {
         target: "launcher"
         function toggle(): void {
-            launcherVisible = !launcherVisible
-            if (launcherVisible) {
-                launcherOpenDelay.restart()
-            } else {
-                launcherOpenDelay.stop()
+            if (launcher.visible) {
                 launcher.visible = false
+                launcherVisible = false
+            } else {
+                launcherVisible = true
+                launcher.visible = true
             }
         }
     }
@@ -1871,16 +1871,6 @@ ShellRoot {
         target: "volume"
         function toggle(): void {
             root.togglePopup(volumePopup)
-        }
-    }
-
-    Timer {
-        id: launcherOpenDelay
-        interval: 100
-        repeat: false
-        onTriggered: {
-            launcher.visible = true
-            launcher.activateLauncher()
         }
     }
 
