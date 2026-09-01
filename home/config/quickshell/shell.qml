@@ -2128,94 +2128,109 @@ ShellRoot {
                     }
                 }
 
-                RowLayout {
-                    spacing: 4 * root.menuScale
+                Rectangle {
+                    id: trayPill
+                    visible: trayRepeater.count > 0
+                    implicitHeight: 24 * root.menuScale
+                    implicitWidth: trayPillContent.implicitWidth + (root.trayExpanded ? 12 * root.menuScale : 6 * root.menuScale)
+                    radius: 12 * root.menuScale
+                    color: root.trayExpanded ? root.settingsRaised : (trayToggleMouse.containsMouse ? root.settingsRaised : "transparent")
+                    border.width: root.trayExpanded ? 1 : 0
+                    border.color: root.settingsOutline
+                    clip: true
 
-                    Item {
-                        id: trayContainer
-                        visible: trayRepeater.count > 0
-                        implicitHeight: 24 * root.menuScale
-                        implicitWidth: root.trayExpanded ? trayLayout.implicitWidth : 0
-                        clip: true
+                    Behavior on implicitWidth {
+                        enabled: !root.reducedMotion
+                        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Behavior on border.width { NumberAnimation { duration: 100 } }
 
-                        Behavior on implicitWidth {
-                            enabled: !root.reducedMotion
-                            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-                        }
+                    RowLayout {
+                        id: trayPillContent
+                        anchors.centerIn: parent
+                        spacing: 2 * root.menuScale
 
-                        RowLayout {
-                            id: trayLayout
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 3 * root.menuScale
+                        Item {
+                            id: trayContainer
+                            implicitHeight: 22 * root.menuScale
+                            implicitWidth: root.trayExpanded ? trayLayout.implicitWidth : 0
+                            clip: true
 
-                            Repeater {
-                                id: trayRepeater
-                                model: SystemTray.items
+                            Behavior on implicitWidth {
+                                enabled: !root.reducedMotion
+                                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                            }
 
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    implicitWidth: 22 * root.menuScale
-                                    implicitHeight: 22 * root.menuScale
-                                    radius: 5
-                                    color: panelTrayMouse.containsMouse ? root.settingsRaised : "transparent"
+                            RowLayout {
+                                id: trayLayout
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 4 * root.menuScale
 
-                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                Repeater {
+                                    id: trayRepeater
+                                    model: SystemTray.items
 
-                                    Image {
-                                        anchors.centerIn: parent
-                                        source: modelData.icon
-                                        sourceSize.width: 14 * root.menuScale
-                                        sourceSize.height: 14 * root.menuScale
-                                        width: 14 * root.menuScale
-                                        height: 14 * root.menuScale
-                                        smooth: true
-                                        mipmap: true
-                                        fillMode: Image.PreserveAspectFit
-                                    }
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        implicitWidth: 20 * root.menuScale
+                                        implicitHeight: 20 * root.menuScale
+                                        radius: 4 * root.menuScale
+                                        color: panelTrayMouse.containsMouse ? root.settingsRaised : "transparent"
 
-                                    MouseArea {
-                                        id: panelTrayMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                        onClicked: event => {
-                                            if (modelData.hasMenu && (event.button === Qt.RightButton || modelData.onlyMenu)) {
-                                                trayPopup.visible = true
-                                                trayPopup.anchor.rect.x = bar.width - 10
-                                                modelData.display(trayPopup, 0, 0)
-                                            } else {
-                                                modelData.activate()
+                                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                                        Image {
+                                            anchors.centerIn: parent
+                                            source: modelData.icon
+                                            sourceSize.width: 14 * root.menuScale
+                                            sourceSize.height: 14 * root.menuScale
+                                            width: 14 * root.menuScale
+                                            height: 14 * root.menuScale
+                                            smooth: true
+                                            mipmap: true
+                                            fillMode: Image.PreserveAspectFit
+                                        }
+
+                                        MouseArea {
+                                            id: panelTrayMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                            onClicked: event => {
+                                                if (modelData.hasMenu && (event.button === Qt.RightButton || modelData.onlyMenu)) {
+                                                    trayPopup.visible = true
+                                                    trayPopup.anchor.rect.x = bar.width - 10
+                                                    modelData.display(trayPopup, 0, 0)
+                                                } else {
+                                                    modelData.activate()
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    Rectangle {
-                        id: trayToggleBtn
-                        visible: trayRepeater.count > 0
-                        implicitWidth: 18 * root.menuScale
-                        implicitHeight: 24 * root.menuScale
-                        radius: 6
-                        color: trayToggleMouse.containsMouse ? root.settingsRaised : "transparent"
+                        Item {
+                            id: trayToggleBtn
+                            implicitWidth: 16 * root.menuScale
+                            implicitHeight: 22 * root.menuScale
 
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                            Text {
+                                anchors.centerIn: parent
+                                text: root.trayExpanded ? "󰅂" : "󰅁"
+                                color: root.muted
+                                font.family: "JetBrains Mono"
+                                font.pixelSize: 11 * root.displayFontScale
+                            }
 
-                        Text {
-                            anchors.centerIn: parent
-                            text: root.trayExpanded ? "󰅂" : "󰅁"
-                            color: root.muted
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 11 * root.displayFontScale
-                        }
-
-                        MouseArea {
-                            id: trayToggleMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: root.trayExpanded = !root.trayExpanded
+                            MouseArea {
+                                id: trayToggleMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: root.trayExpanded = !root.trayExpanded
+                            }
                         }
                     }
                 }
