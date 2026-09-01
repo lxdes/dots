@@ -11,5 +11,5 @@ vulkan-loader
 libva
 libva-utils
 terminus-fonts-console
-iwl7260-firmware
+linux-firmware
 wireless-regdb
