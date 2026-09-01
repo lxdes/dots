@@ -2087,48 +2087,6 @@ ShellRoot {
                 spacing: 12 * root.menuScale
 
                 Rectangle {
-                    visible: root.batteryCapacity >= 0
-                    implicitWidth: batteryLayout.implicitWidth + 10 * root.menuScale
-                    implicitHeight: 24 * root.menuScale
-                    radius: 6
-                    color: batteryMouse.containsMouse ? root.settingsRaised : "transparent"
-
-                    Behavior on color { ColorAnimation { duration: 120 } }
-
-                    RowLayout {
-                        id: batteryLayout
-                        anchors.centerIn: parent
-                        spacing: 4 * root.menuScale
-
-                        Text {
-                            text: root.batteryStatus === "Charging" ? "󰂄" : root.batteryCapacity <= 15 ? "󰁺" : root.batteryCapacity <= 35 ? "󰁼" : root.batteryCapacity <= 65 ? "󰁾" : "󰂀"
-                            color: root.batteryStatus === "Charging" ? "#a6e3a1" : (root.batteryCapacity <= 15 ? "#f38ba8" : foreground)
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 13 * root.displayFontScale
-                        }
-                        Text {
-                            text: root.batteryCapacity + "%"
-                            color: root.batteryCapacity <= 15 ? "#f38ba8" : foreground
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 11 * root.displayFontScale
-                            font.weight: Font.DemiBold
-                        }
-                    }
-
-                    activeFocusOnTab: true
-                    Accessible.role: Accessible.Button
-                    Accessible.name: "Battery " + root.batteryCapacity + " percent. Open session settings"
-                    Keys.onReturnPressed: root.openSettings("Session")
-
-                    MouseArea {
-                        id: batteryMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: root.openSettings("Session")
-                    }
-                }
-
-                Rectangle {
                     id: trayPill
                     visible: trayRepeater.count > 0
                     implicitHeight: 24 * root.menuScale
@@ -2186,6 +2144,48 @@ ShellRoot {
                                 }
                             }
                         }
+                    }
+                }
+
+                Rectangle {
+                    visible: root.batteryCapacity >= 0
+                    implicitWidth: batteryLayout.implicitWidth + 10 * root.menuScale
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: batteryMouse.containsMouse ? root.settingsRaised : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    RowLayout {
+                        id: batteryLayout
+                        anchors.centerIn: parent
+                        spacing: 4 * root.menuScale
+
+                        Text {
+                            text: root.batteryStatus === "Charging" ? "󰂄" : root.batteryCapacity <= 15 ? "󰁺" : root.batteryCapacity <= 35 ? "󰁼" : root.batteryCapacity <= 65 ? "󰁾" : "󰂀"
+                            color: root.batteryStatus === "Charging" ? "#a6e3a1" : (root.batteryCapacity <= 15 ? "#f38ba8" : foreground)
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 13 * root.displayFontScale
+                        }
+                        Text {
+                            text: root.batteryCapacity + "%"
+                            color: root.batteryCapacity <= 15 ? "#f38ba8" : foreground
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 11 * root.displayFontScale
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: "Battery " + root.batteryCapacity + " percent. Open session settings"
+                    Keys.onReturnPressed: root.openSettings("Session")
+
+                    MouseArea {
+                        id: batteryMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: root.openSettings("Session")
                     }
                 }
 
