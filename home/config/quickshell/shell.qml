@@ -539,11 +539,13 @@ ShellRoot {
     }
 
     function applyWallpaper(path) {
-        if (wallpaperApplyProcess.running)
+        if (!path || path.length === 0)
             return
-        wallpaperApplyProcess.pendingPath = path
-        wallpaperApplyProcess.command = ["feh", "--bg-fill", path]
-        wallpaperApplyProcess.running = true
+        const cleanPath = path.replace(/^file:\/\//, "")
+        selectedWallpaper = cleanPath
+        run(["feh", "--bg-fill", cleanPath])
+        run(["sh", "-c", "betterlockscreen -u \"$1\" >/dev/null 2>&1 &", "sh", cleanPath])
+        run(["notify-send", "-a", "Quickshell", "Wallpaper applied", cleanPath.split("/").pop()])
     }
 
     function setIconTheme(theme) {
@@ -602,6 +604,8 @@ ShellRoot {
     function openWallpaperViewer() {
         settingsWindow.visible = false
         closePopups()
+        if (!wallpaperQuery.running)
+            wallpaperQuery.running = true
         wallpaperViewer.visible = true
         wallpaperViewer.requestActivate()
     }
@@ -1471,20 +1475,6 @@ ShellRoot {
         }
     }
 
-    Process {
-        id: wallpaperApplyProcess
-        property string pendingPath: ""
-        stderr: StdioCollector { id: wallpaperApplyError }
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode === 0) {
-                root.selectedWallpaper = pendingPath
-                root.run(["notify-send", "Wallpaper applied", pendingPath.split("/").pop()])
-                root.run(["betterlockscreen", "-u", pendingPath])
-            } else {
-                root.run(["notify-send", "Wallpaper failed", wallpaperApplyError.text.trim() || "Unable to apply wallpaper"])
-            }
-        }
-    }
 
     Process {
         id: agendaQuery
@@ -1624,7 +1614,7 @@ ShellRoot {
 
     Process {
         id: wallpaperQuery
-        command: ["sh", "-c", "find \"$HOME/nux/wallpapers\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) -print 2>/dev/null | sort"]
+        command: ["sh", "-c", "find \"$HOME/nux/wallpapers\" \"$HOME/Pictures/Wallpapers\" \"$HOME/Pictures\" \"$HOME/wallpapers\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) -print 2>/dev/null | sort -u"]
         running: true
         stdout: StdioCollector {
             id: wallpaperOutput

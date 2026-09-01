@@ -85,11 +85,12 @@ Window {
                 currentIndex: count > 0 ? 0 : -1
                 focus: true
 
-                Keys.onReturnPressed: if (currentIndex >= 0) root.applyWallpaper(root.wallpapers[currentIndex])
-                Keys.onEnterPressed: if (currentIndex >= 0) root.applyWallpaper(root.wallpapers[currentIndex])
+                Keys.onReturnPressed: if (currentIndex >= 0) wallpaperViewer.root.applyWallpaper(wallpaperViewer.root.wallpapers[currentIndex])
+                Keys.onEnterPressed: if (currentIndex >= 0) wallpaperViewer.root.applyWallpaper(wallpaperViewer.root.wallpapers[currentIndex])
 
                 delegate: Item {
                     required property string modelData
+                    required property int index
                     width: wallpaperGrid.cellWidth - 10
                     height: wallpaperGrid.cellHeight - 10
                     Accessible.role: Accessible.Button
@@ -98,14 +99,14 @@ Window {
                     Rectangle {
                         anchors.fill: parent
                         color: "#171820"
-                        border.width: root.selectedWallpaper === modelData || wallpaperMouse.containsMouse ? 2 : 1
-                        border.color: root.selectedWallpaper === modelData ? root.accent : (wallpaperMouse.containsMouse ? root.foreground : "#373b41")
+                        border.width: wallpaperViewer.root.selectedWallpaper === modelData || wallpaperMouse.containsMouse ? 2 : 1
+                        border.color: wallpaperViewer.root.selectedWallpaper === modelData ? wallpaperViewer.root.accent : (wallpaperMouse.containsMouse ? wallpaperViewer.root.foreground : "#373b41")
                         clip: true
 
                         Image {
                             id: thumbnail
                             anchors.fill: parent
-                            source: modelData
+                            source: modelData.startsWith("file://") ? modelData : ("file://" + modelData)
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             cache: false
@@ -117,7 +118,7 @@ Window {
                             anchors.centerIn: parent
                             visible: thumbnail.status === Image.Error
                             text: "Preview unavailable"
-                            color: root.muted
+                            color: wallpaperViewer.root.muted
                             font.family: "JetBrains Mono"
                             font.pixelSize: 10
                         }
@@ -127,14 +128,14 @@ Window {
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
                             height: 28
-                            color: root.background
-                            opacity: wallpaperMouse.containsMouse || root.selectedWallpaper === modelData ? 0.9 : 0.72
+                            color: wallpaperViewer.root.background
+                            opacity: wallpaperMouse.containsMouse || wallpaperViewer.root.selectedWallpaper === modelData ? 0.9 : 0.72
                             Text {
                                 anchors.fill: parent
                                 anchors.leftMargin: 8
                                 anchors.rightMargin: 8
                                 text: modelData.split("/").pop()
-                                color: root.foreground
+                                color: wallpaperViewer.root.foreground
                                 font.family: "JetBrains Mono"
                                 font.pixelSize: 9
                                 elide: Text.ElideMiddle
@@ -148,7 +149,7 @@ Window {
                             hoverEnabled: true
                             onClicked: {
                                 wallpaperGrid.currentIndex = index
-                                root.applyWallpaper(modelData)
+                                wallpaperViewer.root.applyWallpaper(modelData)
                             }
                         }
                     }
