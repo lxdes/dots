@@ -138,6 +138,13 @@ ShellRoot {
     property int batteryCapacity: -1
     property string batteryStatus: ""
     property real brightnessLevel: 60
+    property var clipboardHistory: []
+    property string lastClipboardText: ""
+
+    function copyToClipboard(text) {
+        root.run(["sh", "-c", "printf '%s' \"$1\" | xclip -selection clipboard", "sh", text])
+        root.operationErrorMessage = "Copied to clipboard"
+    }
     property bool brightnessAvailable: false
     property bool touchpadEnabled: true
     property bool touchpadAvailable: false
@@ -1485,6 +1492,22 @@ ShellRoot {
     }
 
     Process {
+        id: clipPollProcess
+        command: ["xclip", "-o", "-selection", "clipboard"]
+        stdout: StdioCollector {
+            id: clipOutput
+            onStreamFinished: {
+                const text = clipOutput.text.trim()
+                if (text.length > 0 && text !== root.lastClipboardText) {
+                    root.lastClipboardText = text
+                    const prev = root.clipboardHistory.filter(item => item !== text)
+                    root.clipboardHistory = [text, ...prev].slice(0, 50)
+                }
+            }
+        }
+    }
+
+    Process {
         id: privacyQuery
         command: [root.configDirectory + "/scripts/privacy-status.sh"]
         running: true
@@ -1504,10 +1527,12 @@ ShellRoot {
     }
 
     Timer {
-        interval: 3000
+        interval: 1500
         repeat: true
         running: true
         onTriggered: {
+            if (!clipPollProcess.running)
+                clipPollProcess.running = true
             if (!privacyQuery.running)
                 privacyQuery.running = true
             if (settingsWindow.visible && root.settingsPage === "Session" && !metricsQuery.running)
@@ -1857,13 +1882,31 @@ ShellRoot {
     IpcHandler {
         target: "launcher"
         function toggle(): void {
-            if (launcher.visible) {
+            if (launcher.visible && launcher.mode === "apps") {
                 launcher.visible = false
                 launcherVisible = false
             } else {
+                launcher.mode = "apps"
                 launcherVisible = true
                 launcher.visible = true
             }
+        }
+        function clipboard(): void {
+            if (launcher.visible && launcher.mode === "clipboard") {
+                launcher.visible = false
+                launcherVisible = false
+            } else {
+                launcher.mode = "clipboard"
+                launcherVisible = true
+                launcher.visible = true
+            }
+        }
+    }
+
+    IpcHandler {
+        target: "mic"
+        function toggle(): void {
+            root.toggleMicMute()
         }
     }
 
@@ -2066,6 +2109,110 @@ ShellRoot {
                 spacing: 12 * root.menuScale
 
                 Rectangle {
+                    visible: root.microphoneActive || root.screenShareActive || root.recordingProcess
+                    implicitWidth: privacyRow.implicitWidth + 8 * root.menuScale
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: privacyMouse.containsMouse ? root.settingsRaised : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    RowLayout {
+                        id: privacyRow
+                        anchors.centerIn: parent
+                        spacing: 4 * root.menuScale
+
+                        Text {
+                            visible: root.microphoneActive
+                            text: "󰍬"
+                            color: "#fab387"
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 13 * root.displayFontScale
+                        }
+                        Text {
+                            visible: root.screenShareActive || root.recordingProcess
+                            text: "󰕧"
+                            color: "#f38ba8"
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 13 * root.displayFontScale
+                        }
+                    }
+
+                    MouseArea {
+                        id: privacyMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: root.toggleMicMute()
+                    }
+                }
+
+                Rectangle {
+                    id: mediaTicker
+                    visible: root.currentPlayer && (root.currentPlayer.isPlaying || (root.currentPlayer.trackTitle && root.currentPlayer.trackTitle.length > 0))
+                    implicitWidth: Math.min(200 * root.menuScale, mediaTickerRow.implicitWidth + 12 * root.menuScale)
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: mediaTickerMouse.containsMouse ? root.settingsRaised : "transparent"
+                    clip: true
+
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    RowLayout {
+                        id: mediaTickerRow
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.left: parent.left
+                        anchors.leftMargin: 6 * root.menuScale
+                        anchors.right: parent.right
+                        anchors.rightMargin: 6 * root.menuScale
+                        spacing: 6 * root.menuScale
+
+                        Text {
+                            text: root.currentPlayer && root.currentPlayer.isPlaying ? "󰝚" : "󰏤"
+                            color: root.accent
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 12 * root.displayFontScale
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: {
+                                if (!root.currentPlayer) return ""
+                                const artist = root.currentPlayer.trackArtist || ""
+                                const title = root.currentPlayer.trackTitle || "Playing"
+                                return artist.length > 0 ? (artist + " — " + title) : title
+                            }
+                            color: root.foreground
+                            elide: Text.ElideRight
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 11 * root.displayFontScale
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    MouseArea {
+                        id: mediaTickerMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                        onClicked: event => {
+                            if (event.button === Qt.MiddleButton && root.currentPlayer)
+                                root.currentPlayer.togglePlaying()
+                            else
+                                root.togglePopup(volumePopup)
+                        }
+                        onWheel: wheel => {
+                            if (root.currentPlayer) {
+                                if (wheel.angleDelta.y > 0)
+                                    root.currentPlayer.next()
+                                else
+                                    root.currentPlayer.previous()
+                            }
+                            wheel.accepted = true
+                        }
+                    }
+                }
+
+                Rectangle {
                     visible: root.batteryCapacity >= 0
                     implicitWidth: batteryLayout.implicitWidth + 10 * root.menuScale
                     implicitHeight: 24 * root.menuScale
@@ -2174,10 +2321,12 @@ ShellRoot {
                         id: audioMouseArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                         onClicked: event => {
                             if (event.button === Qt.RightButton)
                                 root.toggleOutputMute()
+                            else if (event.button === Qt.MiddleButton)
+                                root.toggleMicMute()
                             else
                                 root.togglePopup(volumePopup)
                         }

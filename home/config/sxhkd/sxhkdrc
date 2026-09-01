@@ -42,6 +42,21 @@ super + b
 super + space
 	qs ipc call launcher toggle
 
+super + v
+	qs ipc call launcher clipboard
+
+super + comma
+	qs ipc call settings toggle
+
+super + shift + w
+	qs ipc call wallpaper toggle
+
+super + shift + p
+	qs ipc call colorpicker toggle
+
+super + shift + m
+	qs ipc call mic toggle
+
 super + shift + c
       xcolor -f hex -s clipboard
 
