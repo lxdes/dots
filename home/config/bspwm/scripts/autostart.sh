@@ -37,6 +37,7 @@ setup_display
 	set -- "$HOME/nux/wallpapers"/*
 	[ -f "$1" ] && feh --bg-fill "$1"
 fi) &
+
 run picom --config ~/.config/picom/picom.conf --vsync
 
 # --- Core WM services ---
@@ -47,4 +48,5 @@ run qs -n -c default
 run udiskie
 
 # --- Apps ---
+run copyq --start-server
 run emacs --daemon

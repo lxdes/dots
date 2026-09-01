@@ -138,6 +138,7 @@ ShellRoot {
     property int batteryCapacity: -1
     property string batteryStatus: ""
     property real brightnessLevel: 60
+    property var copyqHistory: []
     property bool trayExpanded: false
     property bool brightnessAvailable: false
     property bool touchpadEnabled: true
@@ -539,6 +540,20 @@ ShellRoot {
         run(["feh", "--bg-fill", cleanPath])
         run(["sh", "-c", "betterlockscreen -u \"$1\" >/dev/null 2>&1 &", "sh", cleanPath])
         run(["notify-send", "-a", "Quickshell", "Wallpaper applied", cleanPath.split("/").pop()])
+    }
+
+    function fetchCopyqHistory() {
+        if (!copyqQuery.running)
+            copyqQuery.running = true
+    }
+
+    function selectCopyqItem(row) {
+        run([root.configDirectory + "/scripts/copyq.py", "select", String(row)])
+    }
+
+    function deleteCopyqItem(row) {
+        run([root.configDirectory + "/scripts/copyq.py", "delete", String(row)])
+        Qt.callLater(fetchCopyqHistory)
     }
 
     function setIconTheme(theme) {
@@ -1192,17 +1207,9 @@ ShellRoot {
     function activatePowerAction(index) {
         const action = powerActions[index]
         powerIndex = index
-        if (!action.command) {
-            closePopups()
-            return
-        }
-        if (pendingPowerIndex !== index) {
-            pendingPowerIndex = index
-            return
-        }
-        pendingPowerIndex = -1
         closePopups()
-        run(action.command)
+        if (action && action.command)
+            run(action.command)
     }
 
     function updateTailscale(output) {
@@ -1468,6 +1475,21 @@ ShellRoot {
         }
     }
 
+
+    Process {
+        id: copyqQuery
+        command: [root.configDirectory + "/scripts/copyq.py", "list", "80"]
+        stdout: StdioCollector {
+            id: copyqOutput
+            onStreamFinished: {
+                try {
+                    root.copyqHistory = JSON.parse(copyqOutput.text.trim()) || []
+                } catch (e) {
+                    root.copyqHistory = []
+                }
+            }
+        }
+    }
 
     Process {
         id: agendaQuery
@@ -1862,6 +1884,18 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "clipboard"
+        function toggle(): void {
+            if (clipboardViewer.visible) {
+                clipboardViewer.visible = false
+            } else {
+                root.fetchCopyqHistory()
+                clipboardViewer.visible = true
+            }
+        }
+    }
+
+    IpcHandler {
         target: "volume"
         function toggle(): void {
             root.togglePopup(volumePopup)
@@ -1989,10 +2023,6 @@ ShellRoot {
                             radius: 1
                             color: root.activeDesktop === modelData.name ? foreground : (modelData.urgent ? "#f38ba8" : (workspaceMouse.containsMouse ? root.settingsRaised : "transparent"))
                             border.width: 0
-
-                            Behavior on color {
-                                ColorAnimation { duration: 120 }
-                            }
 
                             Text {
                                 anchors.centerIn: parent
@@ -3914,7 +3944,7 @@ ShellRoot {
                             implicitHeight: 92
                             focusPolicy: Qt.NoFocus
                             readonly property bool selected: index === root.powerIndex
-                            Accessible.name: root.pendingPowerIndex === index ? "Confirm " + modelData.label : modelData.label
+                            Accessible.name: modelData.label
                             onClicked: root.activatePowerAction(index)
                             contentItem: ColumnLayout {
                                 spacing: 6
@@ -3927,7 +3957,7 @@ ShellRoot {
                                 }
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
-                                    text: root.pendingPowerIndex === index ? "Confirm " + modelData.label : modelData.label
+                                    text: modelData.label
                                     color: foreground
                                     font.family: "JetBrains Mono"
                                     font.pixelSize: 10
@@ -4342,4 +4372,5 @@ ShellRoot {
     WallpaperViewer { id: wallpaperViewer; root: root }
 
     Launcher { id: launcher; root: root }
+    ClipboardViewer { id: clipboardViewer; root: root }
 }

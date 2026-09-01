@@ -9,7 +9,7 @@ name=$(xprop -id "$window_id" WM_NAME 2>/dev/null)
 
 if [ "$class" = "org.quickshell" ] || [ "$class" = "quickshell" ] || [ "$class" = "qs" ] || \
    [ "$instance" = "quickshell" ] || [ "$instance" = "org.quickshell" ] || [ "$instance" = "qs" ] || \
-   echo "$app_id" | grep -q "org.quickshell" || echo "$name" | grep -qE "Launcher|Settings|Wallpaper Viewer"; then
+   echo "$app_id" | grep -q "org.quickshell" || echo "$name" | grep -qE "Launcher|Settings|Wallpaper Viewer|Clipboard"; then
     printf '%s\n' 'border=off state=floating focus=on'
     exit 0
 fi
