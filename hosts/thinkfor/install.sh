@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+#
+# ThinkPad X1 Carbon Gen 10 (thinkfor) install script.
+#
+# NOTE: If bootstrapping from a minimal Fedora Everything TTY without Wi-Fi:
+#   1. Connect via phone USB Tethering or Ethernet adapter.
+#   2. Run:
+#        sudo dnf install -y linux-firmware iwl*-firmware NetworkManager-wifi wpa_supplicant
+#        sudo systemctl restart NetworkManager
+#   3. Connect to Wi-Fi via: nmcli device wifi connect "SSID" password "PASSWORD"
+#
 
 set -euo pipefail
 

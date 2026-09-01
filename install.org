@@ -2,6 +2,14 @@
 #+AUTHOR: LXDE
 
 * Fedora
+** Minimal TTY Wi-Fi Bootstrap (ThinkPad / Intel AX211)
+#+BEGIN_SRC bash
+# Connect via USB phone tethering or Ethernet adapter first, then:
+sudo dnf install -y linux-firmware iwl*-firmware NetworkManager-wifi wpa_supplicant
+sudo systemctl restart NetworkManager
+nmcli device wifi connect "YOUR_SSID" password "YOUR_PASSWORD"
+#+END_SRC
+
 ** Initial
 #+BEGIN_SRC bash
 sudo dnf update --refresh
