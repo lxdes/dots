@@ -38,6 +38,12 @@ bspc config focus_follows_pointer true
 bspc config external_rules_command "$HOME/.config/bspwm/scripts/external_rules.sh"
 
 # --- Window rules ---
+bspc rule -a org.quickshell border=off state=floating focus=on
+bspc rule -a quickshell border=off state=floating focus=on
+bspc rule -a qs border=off state=floating focus=on
+bspc rule -a Launcher border=off state=floating focus=on
+bspc rule -a Settings border=off state=floating focus=on
+bspc rule -a "Wallpaper Viewer" border=off state=floating focus=on
 bspc rule -a Gtk-file-chooser state=floating rectangle=1600x1100+1120+650 center=true
 bspc rule -a Pavucontrol state=floating rectangle=1400x1000+1220+700
 bspc rule -a BoltLauncher state=floating center=true rectangle=1600x1100+1120+650
