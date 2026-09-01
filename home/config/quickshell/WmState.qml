@@ -10,7 +10,18 @@ Singleton {
     property string activeDesktop: ""
     property string activeWindowId: ""
     property string activeTitle: "Desktop"
+    property bool activeFullscreen: false
     property var workspaces: []
+
+    function refreshFullscreen() {
+        if (fullscreenStateQuery.running) {
+            fullscreenRefreshPending = true
+            return
+        }
+        fullscreenStateQuery.running = true
+    }
+
+    property bool fullscreenRefreshPending: false
 
     function parseReport(line) {
         if (!line.startsWith("W"))
@@ -78,6 +89,7 @@ Singleton {
                 if (nextId === root.activeWindowId)
                     return
                 root.activeWindowId = nextId
+                root.refreshFullscreen()
                 titleSpy.running = false
                 if (nextId.length > 0)
                     titleSpy.running = true
@@ -106,4 +118,38 @@ Singleton {
                 root.activeTitle = "Desktop"
         }
     }
+
+    Process {
+        id: bspwmEventProcess
+        command: ["bspc", "subscribe", "node_focus", "node_state", "desktop_focus", "monitor_focus"]
+        running: true
+        stdout: SplitParser {
+            onRead: line => root.refreshFullscreen()
+        }
+        onExited: bspwmEventRestart.restart()
+    }
+
+    Timer {
+        id: bspwmEventRestart
+        interval: 1500
+        repeat: false
+        onTriggered: if (!bspwmEventProcess.running) bspwmEventProcess.running = true
+    }
+
+    Process {
+        id: fullscreenStateQuery
+        command: ["sh", "-c", "id=$(bspc query -N -n focused 2>/dev/null) || { printf 'false\\n'; exit; }; if bspc query -N -n focused.fullscreen >/dev/null 2>&1; then printf 'true\\n'; else case $(xprop -id \"$id\" _NET_WM_STATE 2>/dev/null) in *_NET_WM_STATE_FULLSCREEN*) printf 'true\\n' ;; *) printf 'false\\n' ;; esac; fi"]
+        stdout: StdioCollector {
+            id: fullscreenStateOutput
+            onStreamFinished: root.activeFullscreen = fullscreenStateOutput.text.trim() === "true"
+        }
+        onExited: {
+            if (root.fullscreenRefreshPending) {
+                root.fullscreenRefreshPending = false
+                Qt.callLater(root.refreshFullscreen)
+            }
+        }
+    }
+
+    Component.onCompleted: refreshFullscreen()
 }

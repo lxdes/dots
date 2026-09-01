@@ -251,7 +251,6 @@ ShellRoot {
 
     function updateBspwm(output) {
         root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.split("\n").map(field => field.trim())
         if (fields.length > 0 && fields[0].length > 0)
             activeDesktop = fields[0]
@@ -365,7 +364,6 @@ ShellRoot {
 
     function updateWorkspaces(output) {
         root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const sections = output.split("\n---\n")
         const names = sections.length > 0 ? sections[0].trim().split("\n").filter(name => name.length > 0) : []
         const occupied = sections.length > 1 ? sections[1].trim().split("\n") : []
@@ -398,22 +396,19 @@ ShellRoot {
 
     function updateBattery(output) {
         root.lastBatteryUpdate = Date.now()
-        root.lastBatteryUpdate -= root.lastBatteryUpdate
         const fields = output.trim().split("\n")
         batteryCapacity = fields.length > 0 && !isNaN(Number(fields[0])) ? Number(fields[0]) : -1
         batteryStatus = fields.length > 1 ? fields[1] : ""
     }
 
     function updateActiveTitle(output) {
-        root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
+        root.lastActiveWindowUpdate = Date.now()
         const title = output.trim()
         activeTitle = title.length > 0 ? title : "Desktop"
     }
 
     function updateStatus(output) {
         root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.trim().split("\n")
         audioStatus = fields.length > 0 ? fields[0].trim() : ""
         outputMuted = fields.length > 7 && fields[7].trim() === "yes"
@@ -427,7 +422,6 @@ ShellRoot {
 
     function updateNetworkMetrics(output) {
         root.lastNetworkMetricsUpdate = Date.now()
-        root.lastNetworkMetricsUpdate -= root.lastNetworkMetricsUpdate
         const fields = output.trim().split("\n")
         const nextInterface = fields.length > 0 ? fields[0] : ""
         if (nextInterface !== networkInterface) {
@@ -670,7 +664,6 @@ ShellRoot {
 
     function updateHardwareSettings(output) {
         root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.split("\n")
         brightnessAvailable = fields.length > 0 && fields[0].length > 0 && !isNaN(Number(fields[0]))
         if (brightnessAvailable)
@@ -691,7 +684,6 @@ ShellRoot {
 
     function updateAppearanceSettings(output) {
         root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const fields = output.trim().split("\n")
         if (fields.length > 0 && fields[0].length > 0)
             currentIconTheme = fields[0]
@@ -701,7 +693,6 @@ ShellRoot {
 
     function updateGtkThemes(output) {
         root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
         const themes = output.trim().split("\n").filter(theme => theme.length > 0)
         if (themes.indexOf(currentGtkTheme) === -1)
             themes.unshift(currentGtkTheme)
@@ -788,8 +779,7 @@ ShellRoot {
     }
 
     function updateWifiState(output) {
-        root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
+        root.lastNetworkDevicesUpdate = Date.now()
         const fields = output.trim().split("\n")
         wifiEnabled = fields.length > 0 && fields[0] === "enabled"
         wifiDevice = fields.length > 1 ? fields[1] : ""
@@ -801,8 +791,7 @@ ShellRoot {
     }
 
     function updateVpnProfiles(output) {
-        root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
+        root.lastNetworkDevicesUpdate = Date.now()
         const profiles = []
         for (const line of output.trim().split("\n")) {
             const fields = line.split("\t")
@@ -835,7 +824,6 @@ ShellRoot {
 
     function updateDisplays(output) {
         root.lastDisplayUpdate = Date.now()
-        root.lastDisplayUpdate -= root.lastDisplayUpdate
         const result = []
         for (const line of output.trim().split("\n")) {
             const fields = line.split("\t")
@@ -938,8 +926,7 @@ ShellRoot {
     }
 
     function updateMicStatus(output) {
-        root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
+        root.lastAudioSourcesUpdate = Date.now()
         const fields = output.trim().split("\n")
         if (!micVolumeAdjusting && fields.length > 0 && !isNaN(Number(fields[0])))
             micVolumeLevel = Number(fields[0])
@@ -949,8 +936,10 @@ ShellRoot {
     }
 
     function updateAudioDevices(output, isSource) {
-        root.lastAudioSinksUpdate = Date.now()
-        root.lastAudioSinksUpdate -= root.lastAudioSinksUpdate
+        if (isSource)
+            root.lastAudioSourcesUpdate = Date.now()
+        else
+            root.lastAudioSinksUpdate = Date.now()
         try {
             const devices = JSON.parse(output)
             if (!Array.isArray(devices))
@@ -985,7 +974,6 @@ ShellRoot {
 
     function updateBluetoothDevices(output) {
         root.lastBluetoothUpdate = Date.now()
-        root.lastBluetoothUpdate -= root.lastBluetoothUpdate
         const devices = []
         const lines = output.trim().split("\n")
         if (lines.length > 0 && lines[0].startsWith("@adapter\t")) {
@@ -1014,7 +1002,6 @@ ShellRoot {
 
     function updateNetworkDevices(output) {
         root.lastNetworkDevicesUpdate = Date.now()
-        root.lastNetworkDevicesUpdate -= root.lastNetworkDevicesUpdate
         const bySsid = {}
         for (const line of output.trim().split("\n")) {
             const fields = splitNmcliFields(line)
@@ -1037,7 +1024,6 @@ ShellRoot {
 
     function updateWifiProfiles(output) {
         root.lastNetworkDevicesUpdate = Date.now()
-        root.lastNetworkDevicesUpdate -= root.lastNetworkDevicesUpdate
         const profiles = {}
         for (const line of output.trim().split("\n")) {
             const fields = line.split("\t")
@@ -1125,8 +1111,6 @@ ShellRoot {
 
     function closePopups() {
         volumePopup.visible = false
-        if (typeof legacyVolumePopupWindow !== "undefined")
-            legacyVolumePopupWindow.visible = false
         networkPopup.visible = false
         bluetoothPopup.visible = false
         root.bluetoothPopupExplicitlyOpened = false
@@ -1179,7 +1163,6 @@ ShellRoot {
 
     function updateActiveWindow(id) {
         root.lastActiveWindowUpdate = Date.now()
-        root.lastActiveWindowUpdate -= root.lastActiveWindowUpdate
         const fields = id.trim().split("\n")
         id = fields[0]
         if (id.length === 0)
@@ -1217,7 +1200,6 @@ ShellRoot {
 
     function updateTailscale(output) {
         root.lastTailscaleUpdate = Date.now()
-        root.lastTailscaleUpdate -= root.lastTailscaleUpdate
         try {
             const data = JSON.parse(output)
             const peers = data.Peer || {}
@@ -1271,7 +1253,6 @@ ShellRoot {
 
     function updateExitConfig(output) {
         root.lastExitConfigUpdate = Date.now()
-        root.lastExitConfigUpdate -= root.lastExitConfigUpdate
         try {
             const prefs = JSON.parse(output)
             activeExitNodeAddress = prefs.ExitNodeIP || ""
@@ -1343,7 +1324,6 @@ ShellRoot {
 
     function updateAgenda(output) {
         root.lastAgendaUpdate = Date.now()
-        root.lastAgendaUpdate -= root.lastAgendaUpdate
         try {
             const data = JSON.parse(output)
             agendaConfigured = data.configured === true
@@ -1357,7 +1337,6 @@ ShellRoot {
 
     function updatePrivacyStatus(output) {
         root.lastPrivacyUpdate = Date.now()
-        root.lastPrivacyUpdate -= root.lastPrivacyUpdate
         try {
             const data = JSON.parse(output)
             microphoneActive = data.microphoneActive === true
@@ -1372,7 +1351,6 @@ ShellRoot {
 
     function updateSystemMetrics(output) {
         root.lastMetricsUpdate = Date.now()
-        root.lastMetricsUpdate -= root.lastMetricsUpdate
         try {
             const data = JSON.parse(output)
             cpuPercent = data.cpuPercent === null ? -1 : Number(data.cpuPercent)
@@ -1428,6 +1406,10 @@ ShellRoot {
                 return
             root.pendingActiveWindowId = WmState.activeWindowId
             root.startActiveWindowQuery()
+        }
+        function onActiveFullscreenChanged() {
+            if (WmState.activeFullscreen)
+                root.closePopups()
         }
     }
 
@@ -1994,6 +1976,7 @@ ShellRoot {
 
     PanelWindow {
         id: bar
+        visible: !WmState.activeFullscreen
         screen: root.primaryScreen()
         anchors { top: true; left: true; right: true }
         implicitHeight: root.effectivePanelHeight
@@ -2270,7 +2253,7 @@ ShellRoot {
         visible: false
         title: "Quick Org note"
         x: root.quickNoteCentered ? root.centerX(width) : (root.primaryScreen() ? root.primaryScreen().x + root.primaryScreen().width - width - 10 : Screen.width - width - 10)
-        y: root.quickNoteCentered ? root.centerY(height) : (root.primaryScreen() ? root.primaryScreen().y + root.effectivePanelHeight + 2 : root.effectivePanelHeight + 2)
+        y: root.quickNoteCentered ? root.centerY(height) : (root.primaryScreen() ? root.primaryScreen().y + root.effectivePanelHeight + 8 : root.effectivePanelHeight + 8)
         flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Dialog
         color: "transparent"
         width: root.primaryScreen() ? Math.max(1, Math.min(430 * menuScale, root.primaryScreen().width - 24)) : 430 * menuScale
@@ -2293,7 +2276,19 @@ ShellRoot {
             color: background
             border.width: 1
             border.color: settingsOutline
-            radius: 2
+            radius: 12
+            clip: true
+
+            opacity: quickNotePopup.visible ? 1.0 : 0.0
+            scale: quickNotePopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -2399,7 +2394,7 @@ ShellRoot {
         visible: false
         anchor.window: bar
         anchor.rect.x: (bar.width - width) / 2
-        anchor.rect.y: bar.height + 2
+        anchor.rect.y: bar.height + 8
         grabFocus: true
         color: "transparent"
         implicitWidth: Math.min(330 * menuScale, bar.width - 16)
@@ -2410,8 +2405,20 @@ ShellRoot {
             anchors.margins: 0
             color: background
             border.width: 1
-            border.color: accent
-            radius: 0
+            border.color: settingsOutline
+            radius: 12
+            clip: true
+
+            opacity: calendarPopup.visible ? 1.0 : 0.0
+            scale: calendarPopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -2549,426 +2556,36 @@ ShellRoot {
         barWindow: bar
     }
 
-    Component {
-        id: legacyVolumePopup
-
-    PopupWindow {
-        id: legacyVolumePopupWindow
-        visible: false
-        anchor.window: bar
-        anchor.rect.x: bar.width - legacyVolumePopupWindow.implicitWidth - 10
-        anchor.rect.y: bar.height + 2
-        grabFocus: true
-        color: "transparent"
-        implicitWidth: Math.min(360 * menuScale, bar.width - 16)
-        implicitHeight: Math.min(300 * menuScale, bar.screen.height - bar.height - 12)
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 0
-            color: background
-            border.width: 1
-            border.color: "#373b41"
-            radius: 0
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 18
-                spacing: 14
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 10
-
-                    Rectangle {
-                        Layout.preferredWidth: 34
-                        Layout.preferredHeight: 34
-                        radius: 17
-                        color: accent
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "󰕾"
-                            color: background
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 17 * root.menuFontScale
-                        }
-                    }
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 1
-
-                        Text {
-                            text: "Output volume"
-                            color: foreground
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 13 * root.menuFontScale
-                            font.weight: Font.DemiBold
-                        }
-
-                        Text {
-                            text: root.audioDetail
-                            color: muted
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 9 * root.menuFontScale
-                            maximumLineCount: 1
-                            elide: Text.ElideMiddle
-                            Layout.fillWidth: true
-                            Layout.maximumWidth: 175
-                        }
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    Text {
-                        text: Math.round(root.volumeLevel) + "%"
-                        color: accent
-                        font.family: "JetBrains Mono"
-                        font.pixelSize: 15 * root.menuFontScale
-                        font.weight: Font.DemiBold
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.toggleOutputMute()
-                        }
-                    }
-
-                    Button {
-                        implicitWidth: 28
-                        implicitHeight: 28
-                        text: "󰒓"
-                        onClicked: root.openSettings("Audio")
-                        contentItem: Text {
-                            text: parent.text
-                            color: parent.hovered ? accent : foreground
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.pixelSize: 16 * root.menuFontScale
-                        }
-                        background: Rectangle { radius: 1; color: parent.hovered ? "#252536" : "transparent" }
-                    }
-                }
-
-                Rectangle {
-                    visible: root.currentPlayer !== null
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 66
-                    color: "#171820"
-                    radius: 8
-                    border.width: 1
-                    border.color: "#373b41"
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        spacing: 10
-
-                        Rectangle {
-                            Layout.preferredWidth: 32
-                            Layout.preferredHeight: 32
-                            radius: 6
-                            color: "#252536"
-                            clip: true
-
-                            Image {
-                                id: artImage
-                                anchors.fill: parent
-                                visible: root.currentPlayer !== null && root.currentPlayer.trackArtUrl.length > 0
-                                source: root.currentPlayer ? root.currentPlayer.trackArtUrl : ""
-                                fillMode: Image.PreserveAspectCrop
-                                cache: true
-                            }
-
-                            Text {
-                                anchors.centerIn: parent
-                                visible: !artImage.visible
-                                text: root.currentPlayer && root.currentPlayer.isPlaying ? "󰐊" : "󰏤"
-                                color: accent
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 16 * root.menuFontScale
-                            }
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 1
-
-                            Text {
-                                text: root.currentPlayer ? (root.currentPlayer.trackTitle || "Unknown track") : ""
-                                color: foreground
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 11 * root.menuFontScale
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-
-                            Text {
-                                text: root.currentPlayer ? (root.currentPlayer.trackArtist || root.currentPlayer.trackAlbum || "Unknown artist") : ""
-                                color: muted
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 9 * root.menuFontScale
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.topMargin: 4
-                                Layout.preferredHeight: 3
-                                radius: 2
-                                color: "#373b41"
-
-                                Rectangle {
-                                    width: root.currentPlayer && root.currentPlayer.length > 0 ? parent.width * Math.min(1, root.currentPlayer.position / root.currentPlayer.length) : 0
-                                    height: parent.height
-                                    radius: 2
-                                    color: accent
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-
-                                Text {
-                                    text: root.currentPlayer ? root.formatTrackTime(root.currentPlayer.position) : "0:00"
-                                    color: muted
-                                    font.family: "JetBrains Mono"
-                                    font.pixelSize: 8
-                                }
-
-                                Item { Layout.fillWidth: true }
-
-                                Text {
-                                    text: root.currentPlayer ? root.formatTrackTime(root.currentPlayer.length) : "0:00"
-                                    color: muted
-                                    font.family: "JetBrains Mono"
-                                    font.pixelSize: 8
-                                }
-                            }
-                        }
-
-                        Button {
-                            implicitWidth: 24
-                            implicitHeight: 28
-                            enabled: root.currentPlayer !== null && root.currentPlayer.canGoPrevious
-                            text: "󰒮"
-                            onClicked: root.currentPlayer.previous()
-                            contentItem: Text {
-                                text: parent.text
-                                color: parent.enabled ? foreground : muted
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 14
-                            }
-                            background: Rectangle {
-                                radius: 5
-                                color: parent.hovered ? "#252536" : "transparent"
-                            }
-                        }
-
-                        Button {
-                            implicitWidth: 24
-                            implicitHeight: 28
-                            enabled: root.currentPlayer !== null && (root.currentPlayer.canTogglePlaying || root.currentPlayer.canPlay || root.currentPlayer.canPause)
-                            text: root.currentPlayer && root.currentPlayer.isPlaying ? "󰏤" : "󰐊"
-                            onClicked: root.currentPlayer.togglePlaying()
-                            contentItem: Text {
-                                text: parent.text
-                                color: parent.enabled ? accent : muted
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 14
-                            }
-                            background: Rectangle {
-                                radius: 5
-                                color: parent.hovered ? "#252536" : "transparent"
-                            }
-                        }
-
-                        Button {
-                            implicitWidth: 24
-                            implicitHeight: 28
-                            enabled: root.currentPlayer !== null && root.currentPlayer.canGoNext
-                            text: "󰒭"
-                            onClicked: root.currentPlayer.next()
-                            contentItem: Text {
-                                text: parent.text
-                                color: parent.enabled ? foreground : muted
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.family: "JetBrains Mono"
-                                font.pixelSize: 14
-                            }
-                            background: Rectangle {
-                                radius: 5
-                                color: parent.hovered ? "#252536" : "transparent"
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    id: volumeTrack
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 24
-                    color: "transparent"
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width
-                        height: 5
-                        radius: 3
-                        color: "#373b41"
-
-                        Rectangle {
-                            width: parent.width * root.volumeLevel / 100
-                            height: parent.height
-                            radius: 3
-                            color: accent
-                        }
-                    }
-
-                    Rectangle {
-                        x: Math.max(0, Math.min(parent.width - width, parent.width * root.volumeLevel / 100 - width / 2))
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 16
-                        height: 16
-                        radius: 8
-                        color: foreground
-                        border.width: 3
-                        border.color: accent
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        function updateVolume(mouseX) {
-                            root.setVolume(Math.max(0, Math.min(1, mouseX / width)))
-                        }
-                        onPressed: event => updateVolume(event.x)
-                        onPositionChanged: event => {
-                            if (pressed)
-                                updateVolume(event.x)
-                        }
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 10
-
-                    Text {
-                        text: "󰍬"
-                        color: accent
-                        font.family: "JetBrains Mono"
-                        font.pixelSize: 17 * root.menuFontScale
-                    }
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 1
-
-                        Text {
-                            text: "Microphone"
-                            color: foreground
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 13 * root.menuFontScale
-                            font.weight: Font.DemiBold
-                        }
-
-                        Text {
-                            text: root.micName
-                            color: muted
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 9 * root.menuFontScale
-                            elide: Text.ElideMiddle
-                            Layout.fillWidth: true
-                        }
-                    }
-
-                    Text {
-                        text: root.micMuted ? "Muted" : Math.round(root.micVolumeLevel) + "%"
-                        color: root.micMuted ? "#f38ba8" : accent
-                        font.family: "JetBrains Mono"
-                        font.pixelSize: 13 * root.menuFontScale
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.toggleMicMute()
-                        }
-                    }
-                }
-
-                Rectangle {
-                    id: micTrack
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 24
-                    color: "transparent"
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width
-                        height: 5
-                        radius: 3
-                        color: "#373b41"
-
-                        Rectangle {
-                            width: parent.width * root.micVolumeLevel / 100
-                            height: parent.height
-                            radius: 3
-                            color: root.micMuted ? muted : accent
-                        }
-                    }
-
-                    Rectangle {
-                        x: Math.max(0, Math.min(parent.width - width, parent.width * root.micVolumeLevel / 100 - width / 2))
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 16
-                        height: 16
-                        radius: 8
-                        color: foreground
-                        border.width: 3
-                        border.color: root.micMuted ? muted : accent
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        function updateMic(mouseX) {
-                            root.setMicVolume(Math.max(0, Math.min(1, mouseX / width)))
-                        }
-                        onPressed: event => updateMic(event.x)
-                        onPositionChanged: event => {
-                            if (pressed)
-                                updateMic(event.x)
-                        }
-                    }
-                }
-
-            }
-        }
-    }
-    }
-
     PopupWindow {
         id: networkPopup
         visible: false
         anchor.window: bar
         anchor.rect.x: bar.width - networkPopup.implicitWidth - 10
-        anchor.rect.y: bar.height + 2
+        anchor.rect.y: bar.height + 8
         grabFocus: true
         color: "transparent"
-        implicitWidth: Math.min(300 * menuScale, bar.width - 16)
-        implicitHeight: Math.min(560 * menuScale, bar.screen.height - bar.height - 12)
+        implicitWidth: Math.min(300 * menuScale, bar.width - 40)
+        implicitHeight: Math.min(562 * menuScale, bar.screen.height - bar.height - 12)
 
         Rectangle {
             anchors.fill: parent
             anchors.margins: 0
             color: background
             border.width: 1
-            border.color: "#373b41"
-            radius: 1
+            border.color: settingsOutline
+            radius: 12
             clip: true
+
+            opacity: networkPopup.visible ? 1.0 : 0.0
+            scale: networkPopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -3208,11 +2825,11 @@ ShellRoot {
         visible: false
         anchor.window: bar
         anchor.rect.x: bar.width - bluetoothPopup.implicitWidth - 10
-        anchor.rect.y: bar.height + 2
+        anchor.rect.y: bar.height + 8
         grabFocus: true
         color: "transparent"
-        implicitWidth: Math.min(300 * menuScale, bar.width - 16)
-        implicitHeight: Math.min(390 * menuScale, bar.screen.height - bar.height - 12)
+        implicitWidth: Math.min(300 * menuScale, bar.width - 40)
+        implicitHeight: Math.min(392 * menuScale, bar.screen.height - bar.height - 12)
 
         onVisibleChanged: if (visible && bluetoothPopupExplicitlyOpened) root.refreshBluetoothDevices()
 
@@ -3221,9 +2838,20 @@ ShellRoot {
             anchors.margins: 0
             color: background
             border.width: 1
-            border.color: "#373b41"
-            radius: 1
+            border.color: settingsOutline
+            radius: 12
             clip: true
+
+            opacity: bluetoothPopup.visible ? 1.0 : 0.0
+            scale: bluetoothPopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -3364,7 +2992,7 @@ ShellRoot {
         visible: root.tailscaleState === "Running"
         anchor.window: bar
         anchor.rect.x: bar.width - tailscalePopup.implicitWidth - 10
-        anchor.rect.y: bar.height + 2
+        anchor.rect.y: bar.height + 8
         grabFocus: true
         color: "transparent"
         implicitWidth: Math.min(340 * menuScale, bar.width - 16)
@@ -3375,8 +3003,20 @@ ShellRoot {
             anchors.margins: 0
             color: background
             border.width: 1
-            border.color: "#373b41"
-            radius: 1
+            border.color: settingsOutline
+            radius: 12
+            clip: true
+
+            opacity: tailscalePopup.visible ? 1.0 : 0.0
+            scale: tailscalePopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -3496,8 +3136,20 @@ ShellRoot {
             anchors.margins: 0
             color: background
             border.width: 1
-            border.color: "#373b41"
-            radius: 1
+            border.color: settingsOutline
+            radius: 12
+            clip: true
+
+            opacity: exitNodePopup.visible ? 1.0 : 0.0
+            scale: exitNodePopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -3656,7 +3308,7 @@ ShellRoot {
         visible: false
         anchor.window: bar
         anchor.rect.x: bar.width - notificationPopup.implicitWidth - 10
-        anchor.rect.y: bar.height + 2
+        anchor.rect.y: bar.height + 8
         grabFocus: true
         color: "transparent"
         implicitWidth: Math.min(420 * menuScale, bar.width - 16)
@@ -3667,9 +3319,20 @@ ShellRoot {
             anchors.margins: 0
             color: background
             border.width: 1
-            border.color: "#373b41"
-            radius: 1
+            border.color: settingsOutline
+            radius: 12
             clip: true
+
+            opacity: notificationPopup.visible ? 1.0 : 0.0
+            scale: notificationPopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -4050,9 +3713,21 @@ ShellRoot {
             anchors.margins: 0
             color: background
             border.width: 1
-            border.color: "#373b41"
-            radius: 1
+            border.color: settingsOutline
+            radius: 12
+            clip: true
             focus: true
+
+            opacity: powerPopup.visible ? 1.0 : 0.0
+            scale: powerPopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             Keys.onPressed: event => {
                 switch (event.key) {
@@ -4204,9 +3879,21 @@ ShellRoot {
             anchors.margins: 0
             color: background
             border.width: 1
-            border.color: accent
-            radius: 1
+            border.color: settingsOutline
+            radius: 12
+            clip: true
             focus: true
+
+            opacity: screenshotPopup.visible ? 1.0 : 0.0
+            scale: screenshotPopup.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             Keys.onPressed: event => {
                 switch (event.key) {
@@ -4331,7 +4018,19 @@ ShellRoot {
             color: background
             border.width: 1
             border.color: accent
-            radius: 8
+            radius: 12
+            clip: true
+
+            opacity: displayConfirmation.visible ? 1.0 : 0.0
+            scale: displayConfirmation.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 18
@@ -4385,10 +4084,22 @@ ShellRoot {
 
         Rectangle {
             anchors.fill: parent
-            radius: 1
+            radius: 12
             color: background
             border.width: 1
             border.color: accent
+            clip: true
+
+            opacity: polkitWindow.visible ? 1.0 : 0.0
+            scale: polkitWindow.visible ? 1.0 : 0.97
+            Behavior on opacity {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                enabled: !root.reducedMotion
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            }
 
             ColumnLayout {
                 anchors.fill: parent

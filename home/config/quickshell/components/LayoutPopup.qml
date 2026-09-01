@@ -10,7 +10,7 @@ PopupWindow {
     visible: false
     anchor.window: bar
     anchor.rect.x: Math.max(0, bar.width - implicitWidth)
-    anchor.rect.y: bar.height + 2
+    anchor.rect.y: bar.height + 8
     grabFocus: true
     color: "transparent"
     implicitWidth: Math.min(180, bar.width)
@@ -27,6 +27,19 @@ PopupWindow {
         color: root.background
         border.width: 1
         border.color: "#373b41"
+        radius: 12
+        clip: true
+
+        opacity: layoutPopup.visible ? 1.0 : 0.0
+        scale: layoutPopup.visible ? 1.0 : 0.97
+        Behavior on opacity {
+            enabled: !root.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            enabled: !root.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
 
         ColumnLayout {
             anchors.fill: parent
@@ -71,6 +84,7 @@ PopupWindow {
                         font.pixelSize: 13
                     }
                     background: Rectangle {
+                        radius: 6
                         color: layoutButton.hovered ? "#252536" : "transparent"
                     }
                 }

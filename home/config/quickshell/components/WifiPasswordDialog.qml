@@ -46,7 +46,19 @@ Window {
         color: shellRoot.background
         border.width: 1
         border.color: shellRoot.accent
-        radius: 10
+        radius: 12
+        clip: true
+
+        opacity: dialog.visible ? 1.0 : 0.0
+        scale: dialog.visible ? 1.0 : 0.97
+        Behavior on opacity {
+            enabled: !shellRoot.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            enabled: !shellRoot.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
 
         ColumnLayout {
             anchors.fill: parent

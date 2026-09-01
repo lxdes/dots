@@ -4,19 +4,16 @@
 
 # --------------------- SXHKD / BSPWM CONTROL ---------------------
 
-super + Escape
-	pkill -USR1 -x sxhkd
-
-super + alt + q
+alt + q
 	bspc quit
 
-super + shift + r
+alt + r
 	~/.config/bspwm/scripts/reload.sh
 
-super + shift + p
+alt + p
 	qs ipc call power toggle
 
-super + shift + o
+alt + o
 	qs ipc call note center
 
 # --------------------- APPLICATIONS ---------------------
@@ -48,9 +45,6 @@ super + space
 super + shift + c
       xcolor -f hex -s clipboard
 
-super + m
-	feishin
-
 super + d
 	discord 
 
@@ -68,6 +62,9 @@ super + j
 
 super + s
       steam
+
+super + s
+      signal
 
 # ------------------- SCRATCHPADS -------------------
 
@@ -91,7 +88,7 @@ super + alt + s
 super + alt + r
 	reboot
 
-super + shift + x
+alt + k
 	xkill
 
 # --------------------- AUDIO / BRIGHTNESS ---------------------

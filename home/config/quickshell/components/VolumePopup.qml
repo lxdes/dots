@@ -17,19 +17,63 @@ PopupWindow {
     readonly property color raised: shellRoot.settingsRaised
     readonly property color outline: shellRoot.settingsOutline
     readonly property real fontScale: shellRoot.uiFontScale
+    property real currentTrackPosition: 0
+    readonly property real currentTrackLength: shellRoot.currentPlayer ? (shellRoot.currentPlayer.length || 0) : 0
+    readonly property bool isTrackPlaying: shellRoot.currentPlayer ? shellRoot.currentPlayer.isPlaying : false
+
+    Timer {
+        id: trackPositionTimer
+        interval: 1000
+        repeat: true
+        running: popup.visible && popup.isTrackPlaying
+        triggeredOnStart: true
+        onTriggered: {
+            if (shellRoot.currentPlayer)
+                popup.currentTrackPosition = shellRoot.currentPlayer.position
+        }
+    }
+
+    Connections {
+        target: shellRoot.currentPlayer
+        ignoreUnknownSignals: true
+        function onTrackTitleChanged() {
+            if (shellRoot.currentPlayer)
+                popup.currentTrackPosition = shellRoot.currentPlayer.position
+        }
+        function onPositionChanged() {
+            if (shellRoot.currentPlayer)
+                popup.currentTrackPosition = shellRoot.currentPlayer.position
+        }
+        function onPlaybackStateChanged() {
+            if (shellRoot.currentPlayer)
+                popup.currentTrackPosition = shellRoot.currentPlayer.position
+        }
+        function onIsPlayingChanged() {
+            if (shellRoot.currentPlayer)
+                popup.currentTrackPosition = shellRoot.currentPlayer.position
+        }
+    }
 
     visible: false
     anchor.window: barWindow
     anchor.rect.x: barWindow.width - implicitWidth - 10
-    anchor.rect.y: barWindow.height + 2
+    anchor.rect.y: barWindow.height + 8
     grabFocus: true
     color: "transparent"
     implicitWidth: Math.min(400 * shellRoot.menuScale, barWindow.width - 16)
     implicitHeight: Math.min(content.implicitHeight + 28, barWindow.screen.height - barWindow.height - 12)
 
     onVisibleChanged: {
-        if (visible)
+        if (visible) {
             shellRoot.refreshAudioDevices()
+            if (shellRoot.currentPlayer)
+                popup.currentTrackPosition = shellRoot.currentPlayer.position
+        }
+    }
+
+    onIsTrackPlayingChanged: {
+        if (shellRoot.currentPlayer)
+            popup.currentTrackPosition = shellRoot.currentPlayer.position
     }
 
     Rectangle {
@@ -37,6 +81,19 @@ PopupWindow {
         color: popup.background
         border.width: 1
         border.color: popup.outline
+        radius: 12
+        clip: true
+
+        opacity: popup.visible ? 1.0 : 0.0
+        scale: popup.visible ? 1.0 : 0.97
+        Behavior on opacity {
+            enabled: !shellRoot.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            enabled: !shellRoot.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
 
         ScrollView {
             anchors.fill: parent
@@ -105,28 +162,40 @@ PopupWindow {
                 Rectangle {
                     visible: shellRoot.currentPlayer !== null
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 84 * shellRoot.menuScale
+                    Layout.preferredHeight: 90 * shellRoot.menuScale
                     color: popup.surface
-                    radius: 10 * shellRoot.menuScale
+                    radius: 12 * shellRoot.menuScale
                     border.width: 1
                     border.color: popup.outline
+                    clip: true
+
+                    Image {
+                        anchors.fill: parent
+                        visible: shellRoot.currentPlayer !== null && (shellRoot.currentPlayer.trackArtUrl || "").length > 0
+                        source: shellRoot.currentPlayer ? (shellRoot.currentPlayer.trackArtUrl || "") : ""
+                        fillMode: Image.PreserveAspectCrop
+                        opacity: 0.14
+                    }
 
                     RowLayout {
                         anchors.fill: parent
                         anchors.margins: 10 * shellRoot.menuScale
-                        spacing: 9 * shellRoot.menuScale
+                        spacing: 10 * shellRoot.menuScale
 
                         Rectangle {
-                            Layout.preferredWidth: 54 * shellRoot.menuScale
-                            Layout.preferredHeight: 54 * shellRoot.menuScale
-                            radius: 8 * shellRoot.menuScale
+                            Layout.preferredWidth: 60 * shellRoot.menuScale
+                            Layout.preferredHeight: 60 * shellRoot.menuScale
+                            radius: 10 * shellRoot.menuScale
                             color: popup.raised
+                            border.width: 1
+                            border.color: popup.outline
                             clip: true
+
                             Image {
                                 id: artImage
                                 anchors.fill: parent
-                                visible: shellRoot.currentPlayer !== null && shellRoot.currentPlayer.trackArtUrl.length > 0
-                                source: shellRoot.currentPlayer ? shellRoot.currentPlayer.trackArtUrl : ""
+                                visible: shellRoot.currentPlayer !== null && (shellRoot.currentPlayer.trackArtUrl || "").length > 0
+                                source: shellRoot.currentPlayer ? (shellRoot.currentPlayer.trackArtUrl || "") : ""
                                 fillMode: Image.PreserveAspectCrop
                                 cache: true
                             }
@@ -136,19 +205,20 @@ PopupWindow {
                                 text: "󰝚"
                                 color: popup.accent
                                 font.family: "JetBrains Mono"
-                                font.pixelSize: 20
+                                font.pixelSize: 22
                             }
                         }
 
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 2
+                            spacing: 3
+
                             Text {
                                 Layout.fillWidth: true
                                 text: shellRoot.currentPlayer ? (shellRoot.currentPlayer.trackTitle || "Unknown track") : ""
                                 color: popup.foreground
                                 font.family: "Noto Sans"
-                                font.pixelSize: 10 * popup.fontScale
+                                font.pixelSize: 11 * popup.fontScale
                                 font.weight: Font.DemiBold
                                 elide: Text.ElideRight
                             }
@@ -160,54 +230,82 @@ PopupWindow {
                                 font.pixelSize: 8 * popup.fontScale
                                 elide: Text.ElideRight
                             }
+
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.topMargin: 4
-                                Layout.preferredHeight: 3
+                                Layout.preferredHeight: 4
                                 radius: 2
                                 color: popup.outline
                                 Rectangle {
-                                    width: shellRoot.currentPlayer && shellRoot.currentPlayer.length > 0 ? parent.width * Math.min(1, shellRoot.currentPlayer.position / shellRoot.currentPlayer.length) : 0
+                                    width: popup.currentTrackLength > 0 ? parent.width * Math.min(1, Math.max(0, popup.currentTrackPosition / popup.currentTrackLength)) : 0
                                     height: parent.height
-                                    radius: parent.radius
+                                    radius: 2
                                     color: popup.accent
+
+                                    Behavior on width {
+                                        enabled: !shellRoot.reducedMotion && popup.isTrackPlaying
+                                        NumberAnimation { duration: 950; easing.type: Easing.Linear }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                visible: popup.currentTrackLength > 0
+                                Text {
+                                    text: shellRoot.formatTrackTime(popup.currentTrackPosition)
+                                    color: popup.muted
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: 7 * popup.fontScale
+                                }
+                                Item { Layout.fillWidth: true }
+                                Text {
+                                    text: shellRoot.formatTrackTime(popup.currentTrackLength)
+                                    color: popup.muted
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: 7 * popup.fontScale
                                 }
                             }
                         }
 
-                        PopupIconButton {
-                            scaleFactor: shellRoot.menuScale
-                            text: "󰒮"
-                            enabled: shellRoot.currentPlayer !== null && shellRoot.currentPlayer.canGoPrevious
-                            foregroundColor: popup.foreground
-                            mutedColor: popup.muted
-                            accentColor: popup.accent
-                            hoverColor: popup.raised
-                            Accessible.name: "Previous track"
-                            onClicked: shellRoot.currentPlayer.previous()
-                        }
-                        PopupIconButton {
-                            scaleFactor: shellRoot.menuScale
-                            text: shellRoot.currentPlayer && shellRoot.currentPlayer.isPlaying ? "󰏤" : "󰐊"
-                            enabled: shellRoot.currentPlayer !== null && (shellRoot.currentPlayer.canTogglePlaying || shellRoot.currentPlayer.canPlay || shellRoot.currentPlayer.canPause)
-                            accent: true
-                            foregroundColor: popup.foreground
-                            mutedColor: popup.muted
-                            accentColor: popup.accent
-                            hoverColor: popup.raised
-                            Accessible.name: shellRoot.currentPlayer && shellRoot.currentPlayer.isPlaying ? "Pause" : "Play"
-                            onClicked: shellRoot.currentPlayer.togglePlaying()
-                        }
-                        PopupIconButton {
-                            scaleFactor: shellRoot.menuScale
-                            text: "󰒭"
-                            enabled: shellRoot.currentPlayer !== null && shellRoot.currentPlayer.canGoNext
-                            foregroundColor: popup.foreground
-                            mutedColor: popup.muted
-                            accentColor: popup.accent
-                            hoverColor: popup.raised
-                            Accessible.name: "Next track"
-                            onClicked: shellRoot.currentPlayer.next()
+                        RowLayout {
+                            spacing: 4 * shellRoot.menuScale
+
+                            PopupIconButton {
+                                scaleFactor: shellRoot.menuScale
+                                text: "󰒮"
+                                enabled: shellRoot.currentPlayer !== null && shellRoot.currentPlayer.canGoPrevious
+                                foregroundColor: popup.foreground
+                                mutedColor: popup.muted
+                                accentColor: popup.accent
+                                hoverColor: popup.raised
+                                Accessible.name: "Previous track"
+                                onClicked: shellRoot.currentPlayer.previous()
+                            }
+                            PopupIconButton {
+                                scaleFactor: shellRoot.menuScale
+                                text: shellRoot.currentPlayer && shellRoot.currentPlayer.isPlaying ? "󰏤" : "󰐊"
+                                enabled: shellRoot.currentPlayer !== null && (shellRoot.currentPlayer.canTogglePlaying || shellRoot.currentPlayer.canPlay || shellRoot.currentPlayer.canPause)
+                                accent: true
+                                foregroundColor: popup.foreground
+                                mutedColor: popup.muted
+                                accentColor: popup.accent
+                                hoverColor: popup.raised
+                                Accessible.name: shellRoot.currentPlayer && shellRoot.currentPlayer.isPlaying ? "Pause" : "Play"
+                                onClicked: shellRoot.currentPlayer.togglePlaying()
+                            }
+                            PopupIconButton {
+                                scaleFactor: shellRoot.menuScale
+                                text: "󰒭"
+                                enabled: shellRoot.currentPlayer !== null && shellRoot.currentPlayer.canGoNext
+                                foregroundColor: popup.foreground
+                                mutedColor: popup.muted
+                                accentColor: popup.accent
+                                hoverColor: popup.raised
+                                Accessible.name: "Next track"
+                                onClicked: shellRoot.currentPlayer.next()
+                            }
                         }
                     }
                 }

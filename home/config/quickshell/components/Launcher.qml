@@ -92,14 +92,14 @@ Window {
                         text: "󰣆"
                         color: root.background
                         font.family: "JetBrains Mono"
-                        font.pixelSize: 19 * root.panelFontScale
+                        font.pixelSize: Math.round(19 * root.displayFontScale)
                     }
                 }
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 1
-                    Text { text: "Applications"; color: root.foreground; font.family: "JetBrains Mono"; font.pixelSize: 15 * root.panelFontScale; font.weight: Font.DemiBold }
-                    Text { text: "Launch something"; color: root.muted; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.panelFontScale }
+                    Text { text: "Applications"; color: root.foreground; font.family: "JetBrains Mono"; font.pixelSize: Math.round(15 * root.displayFontScale); font.weight: Font.DemiBold }
+                    Text { text: "Launch something"; color: root.muted; font.family: "JetBrains Mono"; font.pixelSize: Math.round(10 * root.displayFontScale) }
                 }
             }
 
@@ -112,7 +112,7 @@ Window {
                 placeholderTextColor: root.muted
                 selectionColor: root.highlight
                 font.family: "JetBrains Mono"
-                font.pixelSize: 13 * root.panelFontScale
+                font.pixelSize: Math.round(13 * root.displayFontScale)
                 leftPadding: 18 * root.menuScale
                 rightPadding: 62 * root.menuScale
                 onTextChanged: Qt.callLater(() => apps.selectFirst())
@@ -124,7 +124,7 @@ Window {
                     text: "ESC"
                     color: root.muted
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 9 * root.panelFontScale
+                    font.pixelSize: Math.round(9 * root.displayFontScale)
                 }
                 Keys.onEscapePressed: {
                     root.launcherVisible = false
@@ -218,8 +218,8 @@ Window {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 1
-                            Text { text: entry ? entry.name : ""; color: root.foreground; font.family: "JetBrains Mono"; font.pixelSize: 13 * root.panelFontScale; elide: Text.ElideRight; Layout.fillWidth: true }
-                            Text { text: entry ? (entry.genericName || entry.comment) : ""; color: root.muted; font.family: "JetBrains Mono"; font.pixelSize: 10 * root.panelFontScale; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Text { text: entry ? entry.name : ""; color: root.foreground; font.family: "JetBrains Mono"; font.pixelSize: Math.round(13 * root.displayFontScale); elide: Text.ElideRight; Layout.fillWidth: true }
+                            Text { text: entry ? (entry.genericName || entry.comment) : ""; color: root.muted; font.family: "JetBrains Mono"; font.pixelSize: Math.round(10 * root.displayFontScale); elide: Text.ElideRight; Layout.fillWidth: true }
                         }
                     }
                     MouseArea {
@@ -239,7 +239,7 @@ Window {
                     text: search.text.trim().length > 0 ? "No matching applications" : "No applications found"
                     color: root.muted
                     font.family: "JetBrains Mono"
-                    font.pixelSize: 11 * root.panelFontScale
+                    font.pixelSize: Math.round(11 * root.displayFontScale)
                 }
             }
 
@@ -249,7 +249,7 @@ Window {
                 text: launcher.launchError
                 color: "#f38ba8"
                 font.family: "JetBrains Mono"
-                font.pixelSize: 10 * root.panelFontScale
+                font.pixelSize: Math.round(10 * root.displayFontScale)
             }
         }
     }

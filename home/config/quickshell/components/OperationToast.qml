@@ -36,7 +36,19 @@ PopupWindow {
         color: shellRoot.background
         border.width: 1
         border.color: "#f38ba8"
-        radius: 8
+        radius: 12
+        clip: true
+
+        opacity: toast.visible ? 1.0 : 0.0
+        scale: toast.visible ? 1.0 : 0.97
+        Behavior on opacity {
+            enabled: !shellRoot.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            enabled: !shellRoot.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
 
         RowLayout {
             id: content
