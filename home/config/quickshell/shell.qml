@@ -2154,6 +2154,67 @@ ShellRoot {
                 }
 
                 Rectangle {
+                    id: trayPill
+                    visible: trayRepeater.count > 0
+                    implicitHeight: 24 * root.menuScale
+                    implicitWidth: trayLayout.implicitWidth + 10 * root.menuScale
+                    radius: 12 * root.menuScale
+                    color: root.settingsRaised
+                    border.width: 1
+                    border.color: root.settingsOutline
+                    clip: true
+
+                    RowLayout {
+                        id: trayLayout
+                        anchors.centerIn: parent
+                        spacing: 4 * root.menuScale
+
+                        Repeater {
+                            id: trayRepeater
+                            model: SystemTray.items
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                implicitWidth: 20 * root.menuScale
+                                implicitHeight: 20 * root.menuScale
+                                radius: 4 * root.menuScale
+                                color: panelTrayMouse.containsMouse ? root.surface : "transparent"
+
+                                Behavior on color { ColorAnimation { duration: 100 } }
+
+                                Image {
+                                    anchors.centerIn: parent
+                                    source: modelData.icon
+                                    sourceSize.width: 14 * root.menuScale
+                                    sourceSize.height: 14 * root.menuScale
+                                    width: 14 * root.menuScale
+                                    height: 14 * root.menuScale
+                                    smooth: true
+                                    mipmap: true
+                                    fillMode: Image.PreserveAspectFit
+                                }
+
+                                MouseArea {
+                                    id: panelTrayMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: event => {
+                                        if (modelData.hasMenu && (event.button === Qt.RightButton || modelData.onlyMenu)) {
+                                            trayPopup.visible = true
+                                            trayPopup.anchor.rect.x = bar.width - 10
+                                            modelData.display(trayPopup, 0, 0)
+                                        } else {
+                                            modelData.activate()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
                     implicitWidth: 26 * root.menuScale
                     implicitHeight: 24 * root.menuScale
                     radius: 6
@@ -2288,67 +2349,6 @@ ShellRoot {
                         anchors.fill: parent
                         hoverEnabled: true
                         onClicked: root.togglePopup(notificationPopup)
-                    }
-                }
-
-                Rectangle {
-                    id: trayPill
-                    visible: trayRepeater.count > 0
-                    implicitHeight: 24 * root.menuScale
-                    implicitWidth: trayLayout.implicitWidth + 10 * root.menuScale
-                    radius: 12 * root.menuScale
-                    color: root.settingsRaised
-                    border.width: 1
-                    border.color: root.settingsOutline
-                    clip: true
-
-                    RowLayout {
-                        id: trayLayout
-                        anchors.centerIn: parent
-                        spacing: 4 * root.menuScale
-
-                        Repeater {
-                            id: trayRepeater
-                            model: SystemTray.items
-
-                            delegate: Rectangle {
-                                required property var modelData
-                                implicitWidth: 20 * root.menuScale
-                                implicitHeight: 20 * root.menuScale
-                                radius: 4 * root.menuScale
-                                color: panelTrayMouse.containsMouse ? root.surface : "transparent"
-
-                                Behavior on color { ColorAnimation { duration: 100 } }
-
-                                Image {
-                                    anchors.centerIn: parent
-                                    source: modelData.icon
-                                    sourceSize.width: 14 * root.menuScale
-                                    sourceSize.height: 14 * root.menuScale
-                                    width: 14 * root.menuScale
-                                    height: 14 * root.menuScale
-                                    smooth: true
-                                    mipmap: true
-                                    fillMode: Image.PreserveAspectFit
-                                }
-
-                                MouseArea {
-                                    id: panelTrayMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    onClicked: event => {
-                                        if (modelData.hasMenu && (event.button === Qt.RightButton || modelData.onlyMenu)) {
-                                            trayPopup.visible = true
-                                            trayPopup.anchor.rect.x = bar.width - 10
-                                            modelData.display(trayPopup, 0, 0)
-                                        } else {
-                                            modelData.activate()
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
 
@@ -4244,11 +4244,14 @@ ShellRoot {
         flags: Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
         modality: Qt.ApplicationModal
         color: "transparent"
-        width: 320 * menuScale
-        height: 200 * menuScale
+        width: root.primaryScreen() ? Math.min(420 * root.menuScale, root.primaryScreen().width - 32) : 420 * root.menuScale
+        height: polkitCard.implicitHeight
+
+        property bool showPassword: false
 
         onVisibleChanged: {
             response.clear()
+            showPassword = false
             if (visible)
                 polkitFocusTimer.restart()
         }
@@ -4269,128 +4272,278 @@ ShellRoot {
             }
         }
 
+        Shortcut {
+            sequence: "Escape"
+            onActivated: if (polkitAgent.flow) polkitAgent.flow.cancelAuthenticationRequest()
+        }
+
         Rectangle {
+            id: polkitCard
             anchors.fill: parent
-            radius: 12
-            color: background
+            radius: 14 * root.menuScale
+            color: root.settingsSurface
             border.width: 1
-            border.color: accent
+            border.color: root.settingsOutline
             clip: true
             antialiasing: true
             smooth: true
+            implicitHeight: polkitContentLayout.implicitHeight + 36 * root.menuScale
 
             opacity: polkitWindow.visible ? 1.0 : 0.0
             scale: polkitWindow.visible ? 1.0 : 0.97
             Behavior on opacity {
                 enabled: !root.reducedMotion
-                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
             }
             Behavior on scale {
                 enabled: !root.reducedMotion
-                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
             }
 
             ColumnLayout {
+                id: polkitContentLayout
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 6
+                anchors.margins: 18 * root.menuScale
+                spacing: 14 * root.menuScale
 
-                Text {
-                    text: polkitAgent.flow ? polkitAgent.flow.message : "Authentication required"
-                    color: foreground
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 12 * root.menuFontScale
-                    font.weight: Font.DemiBold
-                    wrapMode: Text.Wrap
-                    Layout.fillWidth: true
-                }
-
-                Text {
-                    text: polkitAgent.flow ? polkitAgent.flow.supplementaryMessage : ""
-                    color: polkitAgent.flow && polkitAgent.flow.supplementaryIsError ? "#f38ba8" : muted
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 9 * root.menuFontScale
-                    wrapMode: Text.Wrap
-                    visible: text.length > 0
-                    Layout.fillWidth: true
-                }
-
-                Text {
-                    text: polkitAgent.flow ? polkitAgent.flow.inputPrompt : "Password"
-                    color: muted
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 9 * root.menuFontScale
-                    visible: polkitAgent.flow ? polkitAgent.flow.isResponseRequired : true
-                }
-
-                TextField {
-                    id: response
-                    visible: polkitAgent.flow ? polkitAgent.flow.isResponseRequired : true
-                    Layout.fillWidth: true
-                    echoMode: polkitAgent.flow && polkitAgent.flow.responseVisible ? TextInput.Normal : TextInput.Password
-                    placeholderTextColor: muted
-                    placeholderText: "Enter password"
-                    color: foreground
-                    selectionColor: highlight
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 11
-                    background: Rectangle {
-                        color: "#171820"
-                        radius: 5
-                        border.width: 1
-                        border.color: response.activeFocus ? accent : muted
-                    }
-                    Keys.onReturnPressed: if (submitButton.enabled) submitButton.clicked()
-                    Keys.onEscapePressed: if (polkitAgent.flow) polkitAgent.flow.cancelAuthenticationRequest()
-                }
-
+                // --- Header ---
                 RowLayout {
-                    Layout.alignment: Qt.AlignRight
-                    spacing: 8
+                    Layout.fillWidth: true
+                    spacing: 12 * root.menuScale
 
-                    Button {
-                        implicitWidth: 70
-                        implicitHeight: 28
-                        text: "Cancel"
-                        onClicked: if (polkitAgent.flow) polkitAgent.flow.cancelAuthenticationRequest()
-                        contentItem: Text {
-                            text: parent.text
-                            color: foreground
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 9
-                        }
-                        background: Rectangle {
-                            radius: 5
-                            color: parent.pressed ? "#313244" : (parent.hovered ? "#252536" : "#171820")
-                            border.width: 1
-                            border.color: parent.hovered ? muted : "#373b41"
+                    Rectangle {
+                        implicitWidth: 38 * root.menuScale
+                        implicitHeight: 38 * root.menuScale
+                        radius: 10 * root.menuScale
+                        color: root.settingsRaised
+                        border.width: 1
+                        border.color: root.settingsOutline
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰌾"
+                            color: root.accent
+                            font.family: "Symbols Nerd Font Mono"
+                            font.pixelSize: 18 * root.displayFontScale
                         }
                     }
 
-                    Button {
-                        id: submitButton
-                        implicitWidth: 110
-                        implicitHeight: 28
-                        text: "Authenticate"
-                        highlighted: true
-                        enabled: polkitAgent.flow !== null && (!polkitAgent.flow.isResponseRequired || response.text.length > 0)
-                        onClicked: if (polkitAgent.flow) polkitAgent.flow.submit(response.text)
-                        contentItem: Text {
-                            text: parent.text
-                            color: root.background
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Authentication Required"
+                            color: root.foreground
                             font.family: "JetBrains Mono"
-                            font.pixelSize: 9
-                            font.weight: Font.DemiBold
+                            font.pixelSize: 13 * root.displayFontScale
+                            font.weight: Font.Bold
                         }
-                        background: Rectangle {
-                            radius: 5
-                            color: parent.pressed ? foreground : (parent.hovered ? foreground : accent)
-                            border.width: 1
-                            border.color: accent
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Privileged action requested"
+                            color: root.muted
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 10 * root.displayFontScale
+                        }
+                    }
+                }
+
+                // --- Message card ---
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: messageText.implicitHeight + 16 * root.menuScale
+                    radius: 8 * root.menuScale
+                    color: root.settingsRaised
+                    border.width: 1
+                    border.color: root.settingsOutline
+
+                    Text {
+                        id: messageText
+                        anchors.fill: parent
+                        anchors.margins: 8 * root.menuScale
+                        text: polkitAgent.flow ? polkitAgent.flow.message : "Authentication is required to perform this action."
+                        color: root.foreground
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: 11 * root.displayFontScale
+                        wrapMode: Text.Wrap
+                    }
+                }
+
+                // --- Error / Supplementary Alert ---
+                Rectangle {
+                    Layout.fillWidth: true
+                    visible: polkitAgent.flow && polkitAgent.flow.supplementaryMessage && polkitAgent.flow.supplementaryMessage.length > 0
+                    implicitHeight: supplementaryRow.implicitHeight + 14 * root.menuScale
+                    radius: 8 * root.menuScale
+                    color: polkitAgent.flow && polkitAgent.flow.supplementaryIsError ? "#2e151e" : root.settingsRaised
+                    border.width: 1
+                    border.color: polkitAgent.flow && polkitAgent.flow.supplementaryIsError ? "#f38ba8" : root.settingsOutline
+
+                    RowLayout {
+                        id: supplementaryRow
+                        anchors.fill: parent
+                        anchors.margins: 7 * root.menuScale
+                        spacing: 8 * root.menuScale
+
+                        Text {
+                            text: polkitAgent.flow && polkitAgent.flow.supplementaryIsError ? "󰅚" : "󰋽"
+                            color: polkitAgent.flow && polkitAgent.flow.supplementaryIsError ? "#f38ba8" : root.muted
+                            font.family: "Symbols Nerd Font Mono"
+                            font.pixelSize: 14 * root.displayFontScale
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: polkitAgent.flow ? polkitAgent.flow.supplementaryMessage : ""
+                            color: polkitAgent.flow && polkitAgent.flow.supplementaryIsError ? "#f38ba8" : root.muted
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 10 * root.displayFontScale
+                            wrapMode: Text.Wrap
+                        }
+                    }
+                }
+
+                // --- Password input ---
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 5 * root.menuScale
+                    visible: polkitAgent.flow ? polkitAgent.flow.isResponseRequired : true
+
+                    Text {
+                        text: polkitAgent.flow ? (polkitAgent.flow.inputPrompt || "Password") : "Password"
+                        color: root.muted
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: 10 * root.displayFontScale
+                        font.weight: Font.DemiBold
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                        implicitHeight: 38 * root.menuScale
+
+                        TextField {
+                            id: response
+                            anchors.fill: parent
+                            echoMode: (polkitAgent.flow && polkitAgent.flow.responseVisible) || polkitWindow.showPassword ? TextInput.Normal : TextInput.Password
+                            placeholderTextColor: root.muted
+                            placeholderText: "Enter password..."
+                            color: root.foreground
+                            selectionColor: root.highlight
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 11 * root.displayFontScale
+                            leftPadding: 12 * root.menuScale
+                            rightPadding: 36 * root.menuScale
+                            verticalAlignment: TextInput.AlignVCenter
+
+                            background: Rectangle {
+                                color: root.settingsRaised
+                                radius: 8 * root.menuScale
+                                border.width: response.activeFocus ? 1.5 : 1
+                                border.color: response.activeFocus ? root.accent : root.settingsOutline
+
+                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                            }
+
+                            Keys.onReturnPressed: if (submitButton.enabled) submitButton.clicked()
+                            Keys.onEscapePressed: if (polkitAgent.flow) polkitAgent.flow.cancelAuthenticationRequest()
+                        }
+
+                        Rectangle {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 6 * root.menuScale
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 26 * root.menuScale
+                            height: 26 * root.menuScale
+                            radius: 6 * root.menuScale
+                            color: eyeMouse.containsMouse ? root.settingsSurface : "transparent"
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: polkitWindow.showPassword ? "󰈈" : "󰈉"
+                                color: eyeMouse.containsMouse ? root.foreground : root.muted
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 14 * root.displayFontScale
+                            }
+
+                            MouseArea {
+                                id: eyeMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: polkitWindow.showPassword = !polkitWindow.showPassword
+                            }
+                        }
+                    }
+                }
+
+                // --- Action buttons ---
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4 * root.menuScale
+                    spacing: 8 * root.menuScale
+
+                    Item { Layout.fillWidth: true }
+
+                    Rectangle {
+                        implicitWidth: 84 * root.menuScale
+                        implicitHeight: 32 * root.menuScale
+                        radius: 8 * root.menuScale
+                        color: cancelMouse.pressed ? root.empty : (cancelMouse.containsMouse ? root.settingsRaised : "transparent")
+                        border.width: 1
+                        border.color: cancelMouse.containsMouse ? root.muted : root.settingsOutline
+
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Cancel"
+                            color: root.foreground
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 11 * root.displayFontScale
+                        }
+
+                        MouseArea {
+                            id: cancelMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (polkitAgent.flow) polkitAgent.flow.cancelAuthenticationRequest()
+                        }
+                    }
+
+                    Rectangle {
+                        id: submitButton
+                        implicitWidth: 120 * root.menuScale
+                        implicitHeight: 32 * root.menuScale
+                        radius: 8 * root.menuScale
+                        enabled: polkitAgent.flow !== null && (!polkitAgent.flow.isResponseRequired || response.text.length > 0)
+                        color: !enabled ? root.empty : (authMouse.pressed ? Qt.darker(root.accent, 1.1) : (authMouse.containsMouse ? Qt.lighter(root.accent, 1.1) : root.accent))
+
+                        Behavior on color { ColorAnimation { duration: 100 } }
+
+                        signal clicked()
+                        onClicked: if (polkitAgent.flow) polkitAgent.flow.submit(response.text)
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Authenticate"
+                            color: !submitButton.enabled ? root.muted : root.background
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 11 * root.displayFontScale
+                            font.weight: Font.Bold
+                        }
+
+                        MouseArea {
+                            id: authMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: submitButton.enabled
+                            cursorShape: submitButton.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: submitButton.clicked()
                         }
                     }
                 }
