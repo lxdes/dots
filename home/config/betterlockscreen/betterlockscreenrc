@@ -1,0 +1,44 @@
+# ~/.config/betterlockscreen/betterlockscreenrc
+# Antigravity / Quickshell matched palette
+
+# Display options
+display_on=0
+span_image=false
+lock_timeout=300
+fx_list=(dim blur dimblur pixel dimpixel color)
+dim_level=30
+blur_level=2
+pixel_scale=10,1000
+solid_color=0e0e12
+wallpaper_cmd="feh --bg-fill"
+quiet=true
+
+# Font & text
+font="JetBrains Mono"
+locktext="Type password to unlock"
+veriftext="Verifying..."
+wrongtext="Incorrect password"
+time_format="%H:%M"
+
+# Theme colors (RRGGBBAA)
+loginbox=0e0e12cc
+loginshadow=00000000
+ringcolor=bfc9f4ff
+insidecolor=0e0e12dd
+separatorcolor=00000000
+ringvercolor=a6e3a1ff
+insidevercolor=0e0e12ee
+ringwrongcolor=f38ba8ff
+insidewrongcolor=f38ba833
+timecolor=cdd6f4ff
+greetercolor=a6adc8ff
+layoutcolor=a6adc8ff
+keyhlcolor=bfc9f4ff
+bshlcolor=f38ba8ff
+verifcolor=a6e3a1ff
+wrongcolor=f38ba8ff
+modifcolor=f38ba8ff
+bgcolor=0e0e12ff
+
+# Arguments
+lockargs=(--ignore-empty-password --nofork)
