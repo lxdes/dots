@@ -48,7 +48,7 @@ sudo rm -rf ~/.emacs.d
 ** XLibre
 #+BEGIN_SRC bash
 sudo dnf copr enable @xlibre/xlibre-xserver
-sudo dnf install xlibre-xserver xlibre-xf86-input-libinput --allowerasing
+sudo dnf install xlibre-xserver-beta-Xorg xlibre-xf86-input-libinput --allowerasing
 #+END_SRC
 
 ** Librewolf

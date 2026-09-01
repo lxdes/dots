@@ -33,7 +33,7 @@ if ((${#packages[@]})); then
 fi
 
 sudo dnf install -y --allowerasing \
-  xlibre-xserver \
+  xlibre-xserver-beta-Xorg \
   xlibre-xf86-input-libinput
 sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
