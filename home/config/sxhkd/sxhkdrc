@@ -43,7 +43,7 @@ super + space
 	qs ipc call launcher toggle
 
 super + v
-	qs ipc call launcher clipboard
+	copyq toggle
 
 super + comma
 	qs ipc call settings toggle

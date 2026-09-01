@@ -138,14 +138,7 @@ ShellRoot {
     property int batteryCapacity: -1
     property string batteryStatus: ""
     property real brightnessLevel: 60
-    property var clipboardHistory: []
-    property string lastClipboardText: ""
     property bool trayExpanded: false
-
-    function copyToClipboard(text) {
-        root.run(["sh", "-c", "printf '%s' \"$1\" | xclip -selection clipboard", "sh", text])
-        root.operationErrorMessage = "Copied to clipboard"
-    }
     property bool brightnessAvailable: false
     property bool touchpadEnabled: true
     property bool touchpadAvailable: false
@@ -312,7 +305,7 @@ ShellRoot {
 
     function displayNotificationToast() {
         notificationToast.visible = true
-        const timeoutMs = (toastNotification && toastNotification.expireTimeout > 0) ? (toastNotification.expireTimeout * 1000) : 4000
+        const timeoutMs = (toastNotification && toastNotification.expireTimeout > 0) ? (toastNotification.expireTimeout * 1000) : 8000
         notificationToastTimer.interval = timeoutMs
         notificationToastTimer.restart()
     }
@@ -1486,22 +1479,6 @@ ShellRoot {
     }
 
     Process {
-        id: clipPollProcess
-        command: ["xclip", "-o", "-selection", "clipboard"]
-        stdout: StdioCollector {
-            id: clipOutput
-            onStreamFinished: {
-                const text = clipOutput.text.trim()
-                if (text.length > 0 && text !== root.lastClipboardText) {
-                    root.lastClipboardText = text
-                    const prev = root.clipboardHistory.filter(item => item !== text)
-                    root.clipboardHistory = [text, ...prev].slice(0, 50)
-                }
-            }
-        }
-    }
-
-    Process {
         id: privacyQuery
         command: [root.configDirectory + "/scripts/privacy-status.sh"]
         running: true
@@ -1525,8 +1502,6 @@ ShellRoot {
         repeat: true
         running: true
         onTriggered: {
-            if (!clipPollProcess.running)
-                clipPollProcess.running = true
             if (!privacyQuery.running)
                 privacyQuery.running = true
             if (settingsWindow.visible && root.settingsPage === "Session" && !metricsQuery.running)
@@ -1876,21 +1851,10 @@ ShellRoot {
     IpcHandler {
         target: "launcher"
         function toggle(): void {
-            if (launcher.visible && launcher.mode === "apps") {
+            if (launcher.visible) {
                 launcher.visible = false
                 launcherVisible = false
             } else {
-                launcher.mode = "apps"
-                launcherVisible = true
-                launcher.visible = true
-            }
-        }
-        function clipboard(): void {
-            if (launcher.visible && launcher.mode === "clipboard") {
-                launcher.visible = false
-                launcherVisible = false
-            } else {
-                launcher.mode = "clipboard"
                 launcherVisible = true
                 launcher.visible = true
             }
@@ -2087,67 +2051,6 @@ ShellRoot {
                 spacing: 12 * root.menuScale
 
                 Rectangle {
-                    id: trayPill
-                    visible: trayRepeater.count > 0
-                    implicitHeight: 24 * root.menuScale
-                    implicitWidth: trayLayout.implicitWidth + 10 * root.menuScale
-                    radius: 12 * root.menuScale
-                    color: root.settingsRaised
-                    border.width: 1
-                    border.color: root.settingsOutline
-                    clip: true
-
-                    RowLayout {
-                        id: trayLayout
-                        anchors.centerIn: parent
-                        spacing: 4 * root.menuScale
-
-                        Repeater {
-                            id: trayRepeater
-                            model: SystemTray.items
-
-                            delegate: Rectangle {
-                                required property var modelData
-                                implicitWidth: 20 * root.menuScale
-                                implicitHeight: 20 * root.menuScale
-                                radius: 4 * root.menuScale
-                                color: panelTrayMouse.containsMouse ? root.surface : "transparent"
-
-                                Behavior on color { ColorAnimation { duration: 100 } }
-
-                                Image {
-                                    anchors.centerIn: parent
-                                    source: modelData.icon
-                                    sourceSize.width: 14 * root.menuScale
-                                    sourceSize.height: 14 * root.menuScale
-                                    width: 14 * root.menuScale
-                                    height: 14 * root.menuScale
-                                    smooth: true
-                                    mipmap: true
-                                    fillMode: Image.PreserveAspectFit
-                                }
-
-                                MouseArea {
-                                    id: panelTrayMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    onClicked: event => {
-                                        if (modelData.hasMenu && (event.button === Qt.RightButton || modelData.onlyMenu)) {
-                                            trayPopup.visible = true
-                                            trayPopup.anchor.rect.x = bar.width - 10
-                                            modelData.display(trayPopup, 0, 0)
-                                        } else {
-                                            modelData.activate()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
                     visible: root.batteryCapacity >= 0
                     implicitWidth: batteryLayout.implicitWidth + 10 * root.menuScale
                     implicitHeight: 24 * root.menuScale
@@ -2324,6 +2227,67 @@ ShellRoot {
                         anchors.fill: parent
                         hoverEnabled: true
                         onClicked: root.togglePopup(notificationPopup)
+                    }
+                }
+
+                Rectangle {
+                    id: trayPill
+                    visible: trayRepeater.count > 0
+                    implicitHeight: 24 * root.menuScale
+                    implicitWidth: trayLayout.implicitWidth + 10 * root.menuScale
+                    radius: 12 * root.menuScale
+                    color: root.settingsRaised
+                    border.width: 1
+                    border.color: root.settingsOutline
+                    clip: true
+
+                    RowLayout {
+                        id: trayLayout
+                        anchors.centerIn: parent
+                        spacing: 4 * root.menuScale
+
+                        Repeater {
+                            id: trayRepeater
+                            model: SystemTray.items
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                implicitWidth: 20 * root.menuScale
+                                implicitHeight: 20 * root.menuScale
+                                radius: 4 * root.menuScale
+                                color: panelTrayMouse.containsMouse ? root.surface : "transparent"
+
+                                Behavior on color { ColorAnimation { duration: 100 } }
+
+                                Image {
+                                    anchors.centerIn: parent
+                                    source: modelData.icon
+                                    sourceSize.width: 14 * root.menuScale
+                                    sourceSize.height: 14 * root.menuScale
+                                    width: 14 * root.menuScale
+                                    height: 14 * root.menuScale
+                                    smooth: true
+                                    mipmap: true
+                                    fillMode: Image.PreserveAspectFit
+                                }
+
+                                MouseArea {
+                                    id: panelTrayMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: event => {
+                                        if (modelData.hasMenu && (event.button === Qt.RightButton || modelData.onlyMenu)) {
+                                            trayPopup.visible = true
+                                            trayPopup.anchor.rect.x = bar.width - 10
+                                            modelData.display(trayPopup, 0, 0)
+                                        } else {
+                                            modelData.activate()
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -3649,7 +3613,7 @@ ShellRoot {
 
     Timer {
         id: notificationToastTimer
-        interval: toastNotification && toastNotification.expireTimeout > 0 ? toastNotification.expireTimeout * 1000 : 4000
+        interval: toastNotification && toastNotification.expireTimeout > 0 ? toastNotification.expireTimeout * 1000 : 8000
         repeat: false
         onTriggered: root.clearNotificationToast("expire")
     }
@@ -3669,7 +3633,7 @@ ShellRoot {
             hoverEnabled: true
             onEntered: notificationToastTimer.stop()
             onExited: {
-                notificationToastTimer.interval = 4000
+                notificationToastTimer.interval = 8000
                 notificationToastTimer.restart()
             }
         }
