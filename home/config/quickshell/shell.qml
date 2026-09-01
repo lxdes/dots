@@ -312,7 +312,7 @@ ShellRoot {
 
     function displayNotificationToast() {
         notificationToast.visible = true
-        const timeoutMs = (toastNotification && toastNotification.expireTimeout > 0) ? (toastNotification.expireTimeout * 1000) : 6000
+        const timeoutMs = (toastNotification && toastNotification.expireTimeout > 0) ? (toastNotification.expireTimeout * 1000) : 4000
         notificationToastTimer.interval = timeoutMs
         notificationToastTimer.restart()
     }
@@ -3695,7 +3695,7 @@ ShellRoot {
 
     Timer {
         id: notificationToastTimer
-        interval: toastNotification && toastNotification.expireTimeout > 0 ? toastNotification.expireTimeout * 1000 : 6000
+        interval: toastNotification && toastNotification.expireTimeout > 0 ? toastNotification.expireTimeout * 1000 : 4000
         repeat: false
         onTriggered: root.clearNotificationToast("expire")
     }
@@ -3715,7 +3715,7 @@ ShellRoot {
             hoverEnabled: true
             onEntered: notificationToastTimer.stop()
             onExited: {
-                notificationToastTimer.interval = 6000
+                notificationToastTimer.interval = 4000
                 notificationToastTimer.restart()
             }
         }
