@@ -1,8 +1,8 @@
-dunst
 udiskie
 brightnessctl
-amd-ucode-firmware
-amd-gpu-firmware
+intel-media-driver
+intel-gpu-firmware
+microcode_ctl
 mesa-dri-drivers
 mesa-vulkan-drivers
 mesa-libGL

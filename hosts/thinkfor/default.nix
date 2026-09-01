@@ -7,10 +7,13 @@
   imports = [
     ../../home.nix
     ../../modules/apps/bolt.nix
+    ../../modules/apps/protonvpn.nix
+    ../../modules/apps/cinny.nix
     ../../modules/apps/discord.nix
     ../../modules/apps/localsend.nix
     ../../modules/apps/protonplus.nix
     ../../modules/apps/signal.nix
+    ../../modules/apps/eartag.nix
     ../../modules/apps/onlyoffice.nix
     ../../modules/cli/bluetui.nix
     ../../modules/cli/herdr.nix

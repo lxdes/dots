@@ -20,9 +20,11 @@ wmname
 xdotool
 emacs
 librewolf
-i3lock
+i3lock-color
+betterlockscreen
 ImageMagick
 NetworkManager-tui
 tailscale
 wezterm
 xclip
+xcolor

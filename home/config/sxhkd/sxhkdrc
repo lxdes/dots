@@ -130,7 +130,7 @@ ctrl + alt + v
 	bspc rule -a \* -o state=floating ; pavucontrol
 
 
-# --------------------- DUNST (NOTIFICATIONS) ---------------------
+# --------------------- NOTIFICATIONS ---------------------
 
 super + shift + Escape
 	qs ipc call notifications toggle

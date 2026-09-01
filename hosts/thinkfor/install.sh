@@ -9,6 +9,8 @@ copr_repos=(
 	errornointernet/quickshell
 	@xlibre/xlibre-xserver
 	lxdes/xcolor
+	lxdes/i3lock-color
+	lxdes/betterlockscreen
 	wezfurlong/wezterm-nightly
 )
 
@@ -32,8 +34,7 @@ fi
 
 sudo dnf install -y --allowerasing \
 	xlibre-xserver \
-	xlibre-xf86-input-libinput \
-	xlibre-xf86-video-amdgpu
+	xlibre-xf86-input-libinput
 sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
 sudo systemctl enable --now tailscaled.service

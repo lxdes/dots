@@ -9,6 +9,8 @@ copr_repos=(
   errornointernet/quickshell
   @xlibre/xlibre-xserver
   lxdes/xcolor
+  lxdes/i3lock-color
+  lxdes/betterlockscreen
   wezfurlong/wezterm-nightly
 )
 
