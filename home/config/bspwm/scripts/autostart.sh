@@ -32,6 +32,7 @@ setup_display() {
 }
 
 setup_display
+[ -x "$HOME/.config/bspwm/appearance.sh" ] && "$HOME/.config/bspwm/appearance.sh"
 [ -x "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/hardware-state.sh" ] && "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/hardware-state.sh"
 (if [ -x "$HOME/.fehbg" ]; then "$HOME/.fehbg"; else
 	set -- "$HOME/nux/wallpapers"/*

@@ -22,13 +22,13 @@ bspc monitor -d 1 2 3 4 5 6 7 8 9 0
 # --- Appearance ---
 bspc config border_width 2
 bspc config window_gap 6
-[ -x "$HOME/.config/bspwm/appearance.sh" ] && "$HOME/.config/bspwm/appearance.sh"
 bspc config top_padding 32
 bspc config bottom_padding 0
 bspc config borderless_monocle true
 bspc config gapless_monocle true
 bspc config focused_border_color "#bfc9f4"
 bspc config normal_border_color "#13141c"
+[ -x "$HOME/.config/bspwm/appearance.sh" ] && "$HOME/.config/bspwm/appearance.sh"
 
 # --- Behavior ---
 bspc config automatic_scheme alternate
@@ -45,9 +45,9 @@ bspc rule -a Launcher border=off state=floating focus=on
 bspc rule -a Settings border=off state=floating focus=on
 bspc rule -a "Wallpaper Viewer" border=off state=floating focus=on
 bspc rule -a Clipboard border=off state=floating focus=on
-bspc rule -a Gtk-file-chooser state=floating rectangle=1600x1100+1120+650 center=true
-bspc rule -a Pavucontrol state=floating rectangle=1400x1000+1220+700
-bspc rule -a BoltLauncher state=floating center=true rectangle=1600x1100+1120+650
+bspc rule -a Gtk-file-chooser state=floating center=true
+bspc rule -a Pavucontrol state=floating center=true
+bspc rule -a BoltLauncher state=floating center=true
 bspc rule -a net-runelite-client-RuneLite state=floating center=true
 bspc rule -a Engrampa state=floating layer=normal
 bspc rule -a org.gnome.FileRoller state=floating
