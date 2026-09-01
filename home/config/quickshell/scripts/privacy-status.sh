@@ -37,12 +37,18 @@ if command -v pactl >/dev/null 2>&1; then
 	esac
 fi
 
-for process in obs obs-studio ffmpeg avconv arecord parec pw-record kooha vokoscreenNG simplescreenrecorder; do
-	if command -v pgrep >/dev/null 2>&1 && pgrep -x "$process" >/dev/null 2>&1; then
+if command -v pgrep >/dev/null 2>&1; then
+	if pgrep -x "obs|obs-studio|ffmpeg|avconv|arecord|parec|pw-record|kooha|vokoscreenNG|simplescreenrecorder" >/dev/null 2>&1; then
 		recording=true
-		break
+	else
+		for process in obs obs-studio ffmpeg avconv arecord parec pw-record kooha vokoscreenNG simplescreenrecorder; do
+			if pgrep -x "$process" >/dev/null 2>&1; then
+				recording=true
+				break
+			fi
+		done
 	fi
-done
+fi
 
 if command -v pw-dump >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
 	if pw-dump 2>/dev/null | jq -e '

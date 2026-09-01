@@ -33,14 +33,21 @@ fi
 temperature_priority=999
 for sensor in "$SYS_ROOT"/class/hwmon/hwmon*/temp*_input; do
 	[ -r "$sensor" ] || continue
-	value=$(awk 'NR == 1 && $1 >= 0 && $1 <= 150000 { printf "%.1f", $1 / 1000 }' "$sensor")
+	read -r raw < "$sensor" 2>/dev/null || continue
+	case "$raw" in
+		''|*[!0-9]*) continue ;;
+	esac
+	if [ "$raw" -lt 0 ] || [ "$raw" -gt 150000 ]; then
+		continue
+	fi
+	value=$(awk -v raw="$raw" 'BEGIN { printf "%.1f", raw / 1000 }')
 	[ -n "$value" ] || continue
 	label_file=${sensor%_input}_label
 	label=
-	[ ! -r "$label_file" ] || label=$(awk 'NR == 1 { print; exit }' "$label_file")
+	[ ! -r "$label_file" ] || read -r label < "$label_file" 2>/dev/null
 	hwmon_dir=${sensor%/*}
 	driver=
-	[ ! -r "$hwmon_dir/name" ] || driver=$(awk 'NR == 1 { print; exit }' "$hwmon_dir/name")
+	[ ! -r "$hwmon_dir/name" ] || read -r driver < "$hwmon_dir/name" 2>/dev/null
 	case "$label" in
 		"Package id 0"|Tctl|CPU) priority=1 ;;
 		Tdie|Package*|Physical*) priority=2 ;;
@@ -62,15 +69,23 @@ done
 
 for busy in "$SYS_ROOT"/class/drm/card*/device/gpu_busy_percent; do
 	[ -r "$busy" ] || continue
-	value=$(awk 'NR == 1 && $1 >= 0 && $1 <= 100 { print $1 }' "$busy")
-	[ -n "$value" ] || continue
-	gpu=$(awk -v current="$gpu" -v value="$value" 'BEGIN { if (current == "null" || value > current) print value; else print current }')
+	read -r raw_gpu < "$busy" 2>/dev/null || continue
+	case "$raw_gpu" in
+		''|*[!0-9]*) continue ;;
+	esac
+	if [ "$raw_gpu" -ge 0 ] && [ "$raw_gpu" -le 100 ]; then
+		if [ "$gpu" = "null" ] || [ -z "$gpu" ] || [ "$raw_gpu" -gt "$gpu" ]; then
+			gpu=$raw_gpu
+		fi
+	fi
 done
 
 if command -v nvidia-smi >/dev/null 2>&1; then
 	value=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null | awk '$1 >= 0 && $1 <= 100 { if ($1 > max) max=$1; found=1 } END { if (found) print max }')
 	if [ -n "$value" ]; then
-		gpu=$(awk -v current="$gpu" -v value="$value" 'BEGIN { if (current == "null" || value > current) print value; else print current }')
+		if [ "$gpu" = "null" ] || [ -z "$gpu" ] || [ "$value" -gt "$gpu" ] 2>/dev/null; then
+			gpu=$value
+		fi
 	fi
 fi
 

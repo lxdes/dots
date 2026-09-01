@@ -29,8 +29,8 @@
     ../../modules/terminals/wezterm.nix
   ];
 
-  nux.cursor.size = 24;
-  nux.xftDpi = 96;
+  nux.cursor.size = 48;
+  nux.xftDpi = 192;
 
   # Add Nix packages needed only on this host here.
   home.packages = [ ];

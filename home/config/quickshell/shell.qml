@@ -1520,7 +1520,7 @@ ShellRoot {
     }
 
     Timer {
-        interval: 1500
+        interval: 3000
         repeat: true
         running: true
         onTriggered: {
@@ -1681,6 +1681,20 @@ ShellRoot {
         onExited: bluetoothMonitorRestart.restart()
     }
 
+    Timer {
+        id: bluetoothMonitorRefresh
+        interval: 1000
+        repeat: false
+        onTriggered: root.refreshBluetoothDevices()
+    }
+
+    Timer {
+        id: bluetoothMonitorRestart
+        interval: 3000
+        repeat: false
+        onTriggered: if (!bluetoothMonitor.running) bluetoothMonitor.running = true
+    }
+
     Process {
         id: networkDevicesQuery
         command: ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "device", "wifi", "list"]
@@ -1724,6 +1738,23 @@ ShellRoot {
         onExited: networkMonitorRestart.restart()
     }
 
+    Timer {
+        id: networkMonitorRefresh
+        interval: 1000
+        repeat: false
+        onTriggered: {
+            if (!networkMetricsQuery.running)
+                networkMetricsQuery.running = true
+        }
+    }
+
+    Timer {
+        id: networkMonitorRestart
+        interval: 3000
+        repeat: false
+        onTriggered: if (!networkMonitor.running) networkMonitor.running = true
+    }
+
     Process {
         id: vpnProfilesQuery
         command: ["sh", "-c", "nmcli -t --escape no -f NAME,TYPE,DEVICE connection show 2>/dev/null | awk -F: '$2 == \"vpn\" || $2 == \"wireguard\" {printf \"%s\\t%s\\t%s\\n\", $1, $2, ($3 == \"\" ? \"--\" : $3)}'"]
@@ -1752,7 +1783,7 @@ ShellRoot {
 
     Process {
         id: hardwareSettingsQuery
-        command: ["sh", "-c", "brightness=$(brightnessctl -c backlight -m 2>/dev/null | awk -F, 'NR == 1 {gsub(/%/, \"\", $4); print $4}'); touchpad=; touchpad_id=$(xinput list --id-only '.*[Tt]ouchpad.*' 2>/dev/null | head -n1); [ -n \"$touchpad_id\" ] && touchpad=$(xinput list-props \"$touchpad_id\" 2>/dev/null | awk -F: '/Device Enabled/ {gsub(/[[:space:]]/, \"\", $2); print $2; exit}'); repeat=$(xset q 2>/dev/null | awk '/auto repeat delay/ {print $4; print $7; exit}'); printf '%s\n%s\n%s\n' \"$brightness\" \"$touchpad\" \"$repeat\""]
+        command: ["sh", "-c", "brightness=$(brightnessctl -c backlight -m 2>/dev/null | awk -F, 'NR == 1 {gsub(/%/, \"\", $4); print $4}'); touchpad=; touchpad_id=$(xinput list --id-only '.*[Tt]ouchpad.*' 2>/dev/null | head -n1); [ -n \"$touchpad_id\" ] && touchpad=$(xinput list-props \"$touchpad_id\" 2>/dev/null | awk -F: '/Device Enabled/ {gsub(/[[:space:]]/, \"\", $2); print $2; exit}'); repeat=$(xset q 2>/dev/null | awk '/auto repeat delay/ {print $4; print $7; exit}'); printf '%s\\n%s\\n%s\\n' \"$brightness\" \"$touchpad\" \"$repeat\""]
         stdout: StdioCollector {
             id: hardwareSettingsOutput
             onStreamFinished: root.updateHardwareSettings(hardwareSettingsOutput.text)
@@ -1779,7 +1810,7 @@ ShellRoot {
 
     Process {
         id: networkMetricsQuery
-        command: ["sh", "-c", "iface=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i==\"dev\") {print $(i+1); exit}}'); [ -z \"$iface\" ] && iface=$(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | awk -F: '$3==\"connected\" && $1!=\"lo\" {print $1; exit}'); type=$(nmcli -g GENERAL.TYPE device show \"$iface\" 2>/dev/null | head -n1); connection=$(nmcli -g GENERAL.CONNECTION device show \"$iface\" 2>/dev/null | head -n1); ip=$(nmcli -g IP4.ADDRESS device show \"$iface\" 2>/dev/null | cut -d/ -f1 | head -n1); signal=$(nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1==\"*\" {print $2; exit}'); rx=0; tx=0; [ -n \"$iface\" ] && rx=$(cat /sys/class/net/\"$iface\"/statistics/rx_bytes 2>/dev/null || printf 0); [ -n \"$iface\" ] && tx=$(cat /sys/class/net/\"$iface\"/statistics/tx_bytes 2>/dev/null || printf 0); printf '%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n' \"$iface\" \"$type\" \"$connection\" \"$ip\" \"$signal\" \"$rx\" \"$tx\""]
+        command: ["sh", "-c", "iface=$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i==\"dev\") {print $(i+1); exit}}'); [ -z \"$iface\" ] && iface=$(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | awk -F: '$3==\"connected\" && $1!=\"lo\" {print $1; exit}'); type=\"\"; connection=\"\"; ip=\"\"; signal=\"\"; rx=0; tx=0; if [ -n \"$iface\" ]; then if [ -d \"/sys/class/net/$iface/wireless\" ] || [ -d \"/sys/class/net/$iface/phy80211\" ]; then type=\"wifi\"; else type=\"ethernet\"; fi; read -r rx < \"/sys/class/net/$iface/statistics/rx_bytes\" 2>/dev/null || rx=0; read -r tx < \"/sys/class/net/$iface/statistics/tx_bytes\" 2>/dev/null || tx=0; ip=$(ip -4 -o addr show dev \"$iface\" 2>/dev/null | awk '{split($4, a, \"/\"); print a[1]; exit}'); signal=$(awk -v iface=\"$iface:\" '$1 == iface { gsub(/\\./, \"\", $3); print int($3); exit }' /proc/net/wireless 2>/dev/null); [ -n \"$signal\" ] || signal=$(nmcli -t -f IN-USE,SIGNAL device wifi list 2>/dev/null | awk -F: '$1==\"*\" {print $2; exit}'); connection=$(nmcli -g GENERAL.CONNECTION device show \"$iface\" 2>/dev/null | head -n1); fi; printf '%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n' \"$iface\" \"$type\" \"$connection\" \"$ip\" \"$signal\" \"$rx\" \"$tx\""]
         running: true
         stdout: StdioCollector {
             id: networkMetricsOutput
