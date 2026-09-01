@@ -71,9 +71,22 @@ Window {
 
     Rectangle {
         anchors.fill: parent
-        color: "#101116"
+        color: root.background
         border.width: 1
-        border.color: "#373b41"
+        border.color: root.settingsOutline
+        radius: 12
+        clip: true
+
+        opacity: launcher.visible ? 1.0 : 0.0
+        scale: launcher.visible ? 1.0 : 0.97
+        Behavior on opacity {
+            enabled: !root.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            enabled: !root.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
 
         ColumnLayout {
             anchors.fill: parent
@@ -116,7 +129,7 @@ Window {
                 leftPadding: 18 * root.menuScale
                 rightPadding: 62 * root.menuScale
                 onTextChanged: Qt.callLater(() => apps.selectFirst())
-                background: Rectangle { color: "#171820"; radius: 10; border.width: 1; border.color: search.activeFocus ? root.accent : "#373b41" }
+                background: Rectangle { color: root.settingsSurface; radius: 10; border.width: 1; border.color: search.activeFocus ? root.accent : root.settingsOutline }
                 Text {
                     anchors.right: parent.right
                     anchors.rightMargin: 18 * root.menuScale
@@ -195,7 +208,7 @@ Window {
                     property var entry: modelData
                     width: apps.width
                     height: 48 * root.menuScale
-                    color: ListView.isCurrentItem ? "#252536" : "transparent"
+                    color: ListView.isCurrentItem ? root.settingsRaised : "transparent"
                     border.width: ListView.isCurrentItem ? 1 : 0
                     border.color: root.accent
                     radius: 8

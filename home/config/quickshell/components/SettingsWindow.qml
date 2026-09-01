@@ -274,11 +274,22 @@ Window {
 
     Rectangle {
         anchors.fill: parent
-        radius: 2
+        radius: 12
         color: window.background
         border.width: 1
         border.color: window.outline
         clip: true
+
+        opacity: window.visible ? 1.0 : 0.0
+        scale: window.visible ? 1.0 : 0.97
+        Behavior on opacity {
+            enabled: !window.root.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            enabled: !window.root.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
 
         Rectangle {
             anchors.top: parent.top

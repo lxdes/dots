@@ -28,8 +28,20 @@ Window {
         anchors.fill: parent
         color: root.background
         border.width: 1
-        border.color: "#373b41"
-        radius: 2
+        border.color: root.settingsOutline
+        radius: 12
+        clip: true
+
+        opacity: wallpaperViewer.visible ? 1.0 : 0.0
+        scale: wallpaperViewer.visible ? 1.0 : 0.97
+        Behavior on opacity {
+            enabled: !root.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            enabled: !root.reducedMotion
+            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+        }
 
         ColumnLayout {
             anchors.fill: parent

@@ -2012,13 +2012,18 @@ ShellRoot {
                             width: 9.4 * root.menuScale
                             height: 9.4 * root.menuScale
                             radius: 1
-                            color: root.activeDesktop === modelData.name ? foreground : (modelData.urgent ? "#f38ba8" : "transparent")
+                            color: root.activeDesktop === modelData.name ? foreground : (modelData.urgent ? "#f38ba8" : (workspaceMouse.containsMouse ? root.settingsRaised : "transparent"))
                             border.width: 0
+
+                            Behavior on color {
+                                ColorAnimation { duration: 120 }
+                            }
 
                             Text {
                                 anchors.centerIn: parent
+                                visible: root.activeDesktop !== modelData.name && !modelData.urgent
                                 text: modelData.name
-                                color: foreground
+                                color: modelData.occupied ? foreground : root.muted
                                 font.family: "JetBrains Mono"
                                 font.pixelSize: 13 * root.displayFontScale
                                 font.weight: Font.DemiBold
@@ -2040,38 +2045,74 @@ ShellRoot {
                 }
             }
 
-            Text {
+            RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin: 8 * root.menuScale
                 Layout.maximumWidth: Math.max(0, Math.min(360 * root.menuScale, bar.width / 2 - clock.width / 2 - 16 * root.menuScale - x - 8 * root.menuScale))
-                text: activeTitle || "Desktop"
-                color: foreground
-                elide: Text.ElideRight
-                font.family: "JetBrains Mono"
-                font.pixelSize: 13 * root.displayFontScale
-                font.weight: Font.DemiBold
+                spacing: 6 * root.menuScale
+
+                Text {
+                    text: "•"
+                    color: root.muted
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: 11 * root.displayFontScale
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: root.activeTitle || "Desktop"
+                    color: foreground
+                    elide: Text.ElideRight
+                    font.family: "JetBrains Mono"
+                    font.pixelSize: 13 * root.displayFontScale
+                    font.weight: Font.DemiBold
+                }
             }
 
             Item { Layout.fillWidth: true }
 
             RowLayout {
                 Layout.rightMargin: 8 * root.menuScale
-                spacing: 20 * root.menuScale
+                spacing: 12 * root.menuScale
 
-
-
-                Text {
+                Rectangle {
                     visible: root.batteryCapacity >= 0
-                    text: (root.batteryStatus === "Charging" ? "󰂄" : root.batteryCapacity <= 15 ? "󰁺" : root.batteryCapacity <= 35 ? "󰁼" : root.batteryCapacity <= 65 ? "󰁾" : "󰂀") + " " + root.batteryCapacity + "%"
-                    color: root.batteryCapacity <= 15 ? "#f38ba8" : foreground
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 13 * root.displayFontScale
+                    implicitWidth: batteryLayout.implicitWidth + 10 * root.menuScale
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: batteryMouse.containsMouse ? root.settingsRaised : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    RowLayout {
+                        id: batteryLayout
+                        anchors.centerIn: parent
+                        spacing: 4 * root.menuScale
+
+                        Text {
+                            text: root.batteryStatus === "Charging" ? "󰂄" : root.batteryCapacity <= 15 ? "󰁺" : root.batteryCapacity <= 35 ? "󰁼" : root.batteryCapacity <= 65 ? "󰁾" : "󰂀"
+                            color: root.batteryStatus === "Charging" ? "#a6e3a1" : (root.batteryCapacity <= 15 ? "#f38ba8" : foreground)
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 13 * root.displayFontScale
+                        }
+                        Text {
+                            text: root.batteryCapacity + "%"
+                            color: root.batteryCapacity <= 15 ? "#f38ba8" : foreground
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 11 * root.displayFontScale
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: "Battery " + root.batteryCapacity + " percent. Open session settings"
                     Keys.onReturnPressed: root.openSettings("Session")
+
                     MouseArea {
+                        id: batteryMouse
                         anchors.fill: parent
+                        hoverEnabled: true
                         onClicked: root.openSettings("Session")
                     }
                 }
@@ -2118,13 +2159,22 @@ ShellRoot {
                     }
                 }
 
-                Text {
-                    text: audioStatus
-                    color: foreground
-                    font.family: "Symbols Nerd Font Mono"
-                    font.pixelSize: 16 * root.displayFontScale
-                    Layout.minimumWidth: 20 * root.menuScale
-                    horizontalAlignment: Text.AlignHCenter
+                Rectangle {
+                    implicitWidth: 26 * root.menuScale
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: audioMouseArea.containsMouse ? root.settingsRaised : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: audioStatus
+                        color: root.outputMuted ? root.muted : foreground
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 16 * root.displayFontScale
+                    }
+
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: root.outputMuted ? "Audio muted" : "Audio " + Math.round(root.volumeLevel) + " percent"
@@ -2147,14 +2197,23 @@ ShellRoot {
                     }
                 }
 
-                Text {
+                Rectangle {
                     visible: bar.width >= 850 * root.menuScale
-                    text: networkStatus
-                    color: foreground
-                    font.family: "Symbols Nerd Font Mono"
-                    font.pixelSize: 13 * root.displayFontScale
-                    Layout.minimumWidth: 20 * root.menuScale
-                    horizontalAlignment: Text.AlignHCenter
+                    implicitWidth: 26 * root.menuScale
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: networkMouseArea.containsMouse ? root.settingsRaised : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: networkStatus
+                        color: foreground
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 13 * root.displayFontScale
+                    }
+
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: "Network " + root.networkDetail
@@ -2168,14 +2227,23 @@ ShellRoot {
                     }
                 }
 
-                Text {
+                Rectangle {
                     visible: bar.width >= 1000 * root.menuScale
-                    text: bluetoothStatus
-                    color: foreground
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 16 * root.displayFontScale
-                    Layout.minimumWidth: 20 * root.menuScale
-                    horizontalAlignment: Text.AlignHCenter
+                    implicitWidth: 26 * root.menuScale
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: bluetoothMouseArea.containsMouse ? root.settingsRaised : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: bluetoothStatus
+                        color: foreground
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: 16 * root.displayFontScale
+                    }
+
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: "Bluetooth " + root.bluetoothDetail
@@ -2189,14 +2257,34 @@ ShellRoot {
                     }
                 }
 
-                Text {
+                Rectangle {
                     visible: bar.width >= 700 * root.menuScale
-                    text: "󰂚"
-                    color: foreground
-                    font.family: "JetBrains Mono"
-                    font.pixelSize: 14 * root.displayFontScale
-                    Layout.minimumWidth: 20 * root.menuScale
-                    horizontalAlignment: Text.AlignHCenter
+                    implicitWidth: 26 * root.menuScale
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: notificationMouseArea.containsMouse ? root.settingsRaised : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 2
+
+                        Text {
+                            text: "󰂚"
+                            color: foreground
+                            font.family: "JetBrains Mono"
+                            font.pixelSize: 14 * root.displayFontScale
+                        }
+                        Rectangle {
+                            visible: notificationServer.trackedNotifications.values.length > 0
+                            width: 4
+                            height: 4
+                            radius: 2
+                            color: root.accent
+                        }
+                    }
+
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
                     Accessible.name: notificationServer.trackedNotifications.values.length + " notifications"
@@ -2212,14 +2300,26 @@ ShellRoot {
             }
         }
 
-        Text {
+        Rectangle {
             id: clock
             anchors.centerIn: parent
-            text: Qt.formatDateTime(new Date(), "ddd dd  HH:mm")
-            color: foreground
-            font.family: "JetBrains Mono"
-            font.pixelSize: 13 * root.displayFontScale
-            font.weight: Font.DemiBold
+            implicitWidth: clockText.implicitWidth + 16 * root.menuScale
+            implicitHeight: 24 * root.menuScale
+            radius: 6
+            color: clockMouse.containsMouse ? root.settingsRaised : "transparent"
+
+            Behavior on color { ColorAnimation { duration: 120 } }
+
+            Text {
+                id: clockText
+                anchors.centerIn: parent
+                text: Qt.formatDateTime(new Date(), "ddd dd  HH:mm")
+                color: foreground
+                font.family: "JetBrains Mono"
+                font.pixelSize: 13 * root.displayFontScale
+                font.weight: Font.DemiBold
+            }
+
             activeFocusOnTab: true
             Accessible.role: Accessible.Button
             Accessible.name: "Open calendar"
@@ -2228,11 +2328,13 @@ ShellRoot {
                 interval: 1000
                 repeat: true
                 running: true
-                onTriggered: parent.text = Qt.formatDateTime(new Date(), "ddd dd  HH:mm")
+                onTriggered: clockText.text = Qt.formatDateTime(new Date(), "ddd dd  HH:mm")
             }
 
             MouseArea {
+                id: clockMouse
                 anchors.fill: parent
+                hoverEnabled: true
                 onClicked: root.togglePopup(calendarPopup)
             }
         }
