@@ -35,7 +35,6 @@ fi
 sudo dnf install -y --allowerasing \
   xlibre-xserver-beta-Xorg \
   xlibre-xf86-input-libinput
-sudo chsh -s /usr/bin/zsh "$USER"
 sudo systemctl enable --now nix-daemon.service
 sudo systemctl enable --now tailscaled.service
 sudo tailscale set --operator="$USER" || true
@@ -47,6 +46,7 @@ if ! grep -qxF 'experimental-features = nix-command flakes' "$HOME/.config/nix/n
 fi
 
 nix run github:nix-community/home-manager -- switch --impure --flake "$repo_root#generic"
+sudo chsh -s /usr/bin/zsh "$USER"
 
 if [[ ! -d "$HOME/.config/emacs/.git" ]]; then
   git clone --depth 1 https://github.com/doomemacs/core "$HOME/.config/emacs"
