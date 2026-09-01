@@ -26,9 +26,11 @@ PopupWindow {
         anchors.fill: parent
         color: root.background
         border.width: 1
-        border.color: "#373b41"
+        border.color: root.settingsOutline
         radius: 12
         clip: true
+        antialiasing: true
+        smooth: true
 
         opacity: layoutPopup.visible ? 1.0 : 0.0
         scale: layoutPopup.visible ? 1.0 : 0.97

@@ -279,6 +279,8 @@ Window {
         border.width: 1
         border.color: window.outline
         clip: true
+        antialiasing: true
+        smooth: true
 
         opacity: window.visible ? 1.0 : 0.0
         scale: window.visible ? 1.0 : 0.97

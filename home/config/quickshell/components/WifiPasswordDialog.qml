@@ -48,6 +48,8 @@ Window {
         border.color: shellRoot.accent
         radius: 12
         clip: true
+        antialiasing: true
+        smooth: true
 
         opacity: dialog.visible ? 1.0 : 0.0
         scale: dialog.visible ? 1.0 : 0.97

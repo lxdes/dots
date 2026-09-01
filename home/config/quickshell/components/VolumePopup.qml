@@ -83,6 +83,8 @@ PopupWindow {
         border.color: popup.outline
         radius: 12
         clip: true
+        antialiasing: true
+        smooth: true
 
         opacity: popup.visible ? 1.0 : 0.0
         scale: popup.visible ? 1.0 : 0.97

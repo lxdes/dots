@@ -38,6 +38,8 @@ PopupWindow {
         border.color: "#f38ba8"
         radius: 12
         clip: true
+        antialiasing: true
+        smooth: true
 
         opacity: toast.visible ? 1.0 : 0.0
         scale: toast.visible ? 1.0 : 0.97

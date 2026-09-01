@@ -31,6 +31,8 @@ Window {
         border.color: root.settingsOutline
         radius: 12
         clip: true
+        antialiasing: true
+        smooth: true
 
         opacity: wallpaperViewer.visible ? 1.0 : 0.0
         scale: wallpaperViewer.visible ? 1.0 : 0.97

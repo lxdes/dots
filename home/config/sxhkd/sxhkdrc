@@ -82,9 +82,6 @@ super + shift + l
 super + alt + s
 	systemctl poweroff
 
-super + alt + r
-	reboot
-
 alt + k
 	xkill
 

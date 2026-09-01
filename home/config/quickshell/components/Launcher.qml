@@ -102,6 +102,8 @@ Window {
         border.color: root.settingsOutline
         radius: 12
         clip: true
+        antialiasing: true
+        smooth: true
 
         opacity: launcher.visible ? 1.0 : 0.0
         scale: launcher.visible ? 1.0 : 0.97

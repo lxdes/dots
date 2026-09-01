@@ -2370,6 +2370,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: quickNotePopup.visible ? 1.0 : 0.0
             scale: quickNotePopup.visible ? 1.0 : 0.97
@@ -2500,6 +2502,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: calendarPopup.visible ? 1.0 : 0.0
             scale: calendarPopup.visible ? 1.0 : 0.97
@@ -2667,6 +2671,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: networkPopup.visible ? 1.0 : 0.0
             scale: networkPopup.visible ? 1.0 : 0.97
@@ -2933,6 +2939,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: bluetoothPopup.visible ? 1.0 : 0.0
             scale: bluetoothPopup.visible ? 1.0 : 0.97
@@ -3098,6 +3106,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: tailscalePopup.visible ? 1.0 : 0.0
             scale: tailscalePopup.visible ? 1.0 : 0.97
@@ -3231,6 +3241,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: exitNodePopup.visible ? 1.0 : 0.0
             scale: exitNodePopup.visible ? 1.0 : 0.97
@@ -3414,6 +3426,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: notificationPopup.visible ? 1.0 : 0.0
             scale: notificationPopup.visible ? 1.0 : 0.97
@@ -3808,6 +3822,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
             focus: true
 
             opacity: powerPopup.visible ? 1.0 : 0.0
@@ -3974,6 +3990,8 @@ ShellRoot {
             border.color: settingsOutline
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
             focus: true
 
             opacity: screenshotPopup.visible ? 1.0 : 0.0
@@ -4112,6 +4130,8 @@ ShellRoot {
             border.color: accent
             radius: 12
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: displayConfirmation.visible ? 1.0 : 0.0
             scale: displayConfirmation.visible ? 1.0 : 0.97
@@ -4181,6 +4201,8 @@ ShellRoot {
             border.width: 1
             border.color: accent
             clip: true
+            antialiasing: true
+            smooth: true
 
             opacity: polkitWindow.visible ? 1.0 : 0.0
             scale: polkitWindow.visible ? 1.0 : 0.97
