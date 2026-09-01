@@ -140,6 +140,7 @@ ShellRoot {
     property real brightnessLevel: 60
     property var clipboardHistory: []
     property string lastClipboardText: ""
+    property bool trayExpanded: false
 
     function copyToClipboard(text) {
         root.run(["sh", "-c", "printf '%s' \"$1\" | xclip -selection clipboard", "sh", text])
@@ -2092,43 +2093,6 @@ ShellRoot {
                 spacing: 12 * root.menuScale
 
                 Rectangle {
-                    visible: root.microphoneActive || root.screenShareActive || root.recordingProcess
-                    implicitWidth: privacyRow.implicitWidth + 8 * root.menuScale
-                    implicitHeight: 24 * root.menuScale
-                    radius: 6
-                    color: privacyMouse.containsMouse ? root.settingsRaised : "transparent"
-
-                    Behavior on color { ColorAnimation { duration: 120 } }
-
-                    RowLayout {
-                        id: privacyRow
-                        anchors.centerIn: parent
-                        spacing: 4 * root.menuScale
-
-                        Text {
-                            visible: root.microphoneActive
-                            text: "󰍬"
-                            color: "#fab387"
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 13 * root.displayFontScale
-                        }
-                        Text {
-                            visible: root.screenShareActive || root.recordingProcess
-                            text: "󰕧"
-                            color: "#f38ba8"
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 13 * root.displayFontScale
-                        }
-                    }
-
-                    MouseArea {
-                        id: privacyMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                    }
-                }
-
-                Rectangle {
                     visible: root.batteryCapacity >= 0
                     implicitWidth: batteryLayout.implicitWidth + 10 * root.menuScale
                     implicitHeight: 24 * root.menuScale
@@ -2170,44 +2134,90 @@ ShellRoot {
                     }
                 }
 
-                RowLayout {
-                    spacing: 4 * root.menuScale
+                Rectangle {
+                    id: trayToggleBtn
+                    visible: trayRepeater.count > 0
+                    implicitWidth: 20 * root.menuScale
+                    implicitHeight: 24 * root.menuScale
+                    radius: 6
+                    color: trayToggleMouse.containsMouse ? root.settingsRaised : "transparent"
 
-                    Repeater {
-                        model: SystemTray.items
+                    Behavior on color { ColorAnimation { duration: 120 } }
 
-                        delegate: Item {
-                            required property var modelData
-                            implicitWidth: 19 * root.menuScale
-                            implicitHeight: 19 * root.menuScale
-                            activeFocusOnTab: true
-                            Accessible.role: Accessible.Button
-                            Accessible.name: modelData.title || "System tray item"
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.trayExpanded ? "󰅃" : "󰅂"
+                        color: root.muted
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: 11 * root.displayFontScale
+                    }
 
-                            Image {
-                                anchors.centerIn: parent
-                                source: modelData.icon
-                                sourceSize.width: 13 * root.menuScale
-                                sourceSize.height: 13 * root.menuScale
-                                width: 13 * root.menuScale
-                                height: 13 * root.menuScale
-                            }
+                    MouseArea {
+                        id: trayToggleMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: root.trayExpanded = !root.trayExpanded
+                    }
+                }
 
-                            MouseArea {
-                                id: panelTrayMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                onClicked: event => {
-                                    if (modelData.hasMenu && (event.button === Qt.RightButton || modelData.onlyMenu)) {
-                                        trayPopup.visible = true
-                                        trayPopup.anchor.rect.x = bar.width - 10
-                                        modelData.display(trayPopup, 0, 0)
-                                    } else
-                                        modelData.activate()
+                Item {
+                    id: trayContainer
+                    visible: trayRepeater.count > 0
+                    implicitHeight: 24 * root.menuScale
+                    implicitWidth: root.trayExpanded ? trayLayout.implicitWidth : 0
+                    clip: true
+
+                    Behavior on implicitWidth {
+                        enabled: !root.reducedMotion
+                        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                    }
+
+                    RowLayout {
+                        id: trayLayout
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 3 * root.menuScale
+
+                        Repeater {
+                            id: trayRepeater
+                            model: SystemTray.items
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                implicitWidth: 22 * root.menuScale
+                                implicitHeight: 22 * root.menuScale
+                                radius: 5
+                                color: panelTrayMouse.containsMouse ? root.settingsRaised : "transparent"
+
+                                Behavior on color { ColorAnimation { duration: 100 } }
+
+                                Image {
+                                    anchors.centerIn: parent
+                                    source: modelData.icon
+                                    sourceSize.width: 14 * root.menuScale
+                                    sourceSize.height: 14 * root.menuScale
+                                    width: 14 * root.menuScale
+                                    height: 14 * root.menuScale
+                                    smooth: true
+                                    mipmap: true
+                                    fillMode: Image.PreserveAspectFit
+                                }
+
+                                MouseArea {
+                                    id: panelTrayMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: event => {
+                                        if (modelData.hasMenu && (event.button === Qt.RightButton || modelData.onlyMenu)) {
+                                            trayPopup.visible = true
+                                            trayPopup.anchor.rect.x = bar.width - 10
+                                            modelData.display(trayPopup, 0, 0)
+                                        } else {
+                                            modelData.activate()
+                                        }
+                                    }
                                 }
                             }
-
                         }
                     }
                 }
