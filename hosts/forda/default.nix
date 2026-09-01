@@ -12,6 +12,7 @@
     ../../modules/apps/discord.nix
     ../../modules/apps/localsend.nix
     ../../modules/apps/protonplus.nix
+    ../../modules/apps/motrix.nix
     ../../modules/apps/signal.nix
     ../../modules/apps/eartag.nix
     ../../modules/apps/onlyoffice.nix
