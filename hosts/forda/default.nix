@@ -8,7 +8,7 @@
     ../../home.nix
     ../../modules/apps/bolt.nix
     ../../modules/apps/protonvpn.nix
-    ../../modules/apps/cinny.nix
+    ../../modules/apps/sable.nix
     ../../modules/apps/discord.nix
     ../../modules/apps/localsend.nix
     ../../modules/apps/protonplus.nix
