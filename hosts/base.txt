@@ -24,6 +24,8 @@ i3lock-color
 betterlockscreen
 ImageMagick
 NetworkManager-tui
+NetworkManager-wifi
+wpa_supplicant
 tailscale
 wezterm
 xclip
