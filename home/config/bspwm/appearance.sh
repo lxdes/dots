@@ -38,6 +38,6 @@ for mon in $(bspc query -M 2>/dev/null); do
 done
 
 for desk in $(bspc query -D 2>/dev/null); do
-	bspc config -d "$desk" top_padding "$top_padding"
+	bspc config -d "$desk" top_padding 0
 	bspc config -d "$desk" window_gap "$window_gap"
 done

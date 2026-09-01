@@ -661,7 +661,7 @@ ShellRoot {
 
     function syncBspwmPadding(padding) {
         const pad = Math.max(0, padding)
-        run(["sh", "-c", "bspc config top_padding \"$1\"; for mon in $(bspc query -M 2>/dev/null); do bspc config -m \"$mon\" top_padding \"$1\"; done; for desk in $(bspc query -D 2>/dev/null); do bspc config -d \"$desk\" top_padding \"$1\"; done", "sync-padding", String(pad)])
+        run(["sh", "-c", "bspc config top_padding \"$1\"; for mon in $(bspc query -M 2>/dev/null); do bspc config -m \"$mon\" top_padding \"$1\"; done; for desk in $(bspc query -D 2>/dev/null); do bspc config -d \"$desk\" top_padding 0; done", "sync-padding", String(pad)])
     }
 
     function setPanelHeight(value) {
