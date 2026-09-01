@@ -51,9 +51,6 @@ super + comma
 super + shift + w
 	qs ipc call wallpaper toggle
 
-super + shift + p
-	qs ipc call colorpicker toggle
-
 super + shift + c
       xcolor -f hex -s clipboard
 

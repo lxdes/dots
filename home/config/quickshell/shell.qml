@@ -308,10 +308,9 @@ ShellRoot {
 
     function displayNotificationToast() {
         notificationToast.visible = true
-        if (toastNotification.expireTimeout >= 0)
-            notificationToastTimer.restart()
-        else
-            notificationToastTimer.stop()
+        const timeoutMs = (toastNotification && toastNotification.expireTimeout > 0) ? (toastNotification.expireTimeout * 1000) : 6000
+        notificationToastTimer.interval = timeoutMs
+        notificationToastTimer.restart()
     }
 
     function clearNotificationToast(reason) {
@@ -1964,15 +1963,6 @@ ShellRoot {
         }
         function open(page: string): void {
             root.openSettings(page)
-        }
-    }
-
-    IpcHandler {
-        target: "colorpicker"
-        function toggle(): void {
-            colorPicker.visible = !colorPicker.visible
-            if (colorPicker.visible)
-                colorPicker.requestActivate()
         }
     }
 
@@ -3748,7 +3738,7 @@ ShellRoot {
 
     Timer {
         id: notificationToastTimer
-        interval: toastNotification && toastNotification.expireTimeout > 0 ? toastNotification.expireTimeout * 1000 : 5000
+        interval: toastNotification && toastNotification.expireTimeout > 0 ? toastNotification.expireTimeout * 1000 : 6000
         repeat: false
         onTriggered: root.clearNotificationToast("expire")
     }
@@ -3762,6 +3752,16 @@ ShellRoot {
         color: "transparent"
         implicitWidth: Math.min(380, bar.width - 24)
         implicitHeight: notificationToastContent.implicitHeight + 28
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            onEntered: notificationToastTimer.stop()
+            onExited: {
+                notificationToastTimer.interval = 6000
+                notificationToastTimer.restart()
+            }
+        }
 
         Rectangle {
             anchors.fill: parent
@@ -4467,6 +4467,4 @@ ShellRoot {
     WallpaperViewer { id: wallpaperViewer; root: root }
 
     Launcher { id: launcher; root: root }
-
-    ColorPicker { id: colorPicker; root: root }
 }
