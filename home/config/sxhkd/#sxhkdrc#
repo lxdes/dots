@@ -1,0 +1,247 @@
+# ====================================================================
+# SXHKDRC KEYBINDS
+# ====================================================================
+
+# --------------------- SXHKD / BSPWM CONTROL ---------------------
+
+super + Escape
+	pkill -USR1 -x sxhkd
+
+super + alt + q
+	bspc quit
+
+super + shift + r
+	~/.config/bspwm/scripts/reload.sh
+
+super + shift + p
+	qs ipc call power toggle
+
+super + shift + o
+	qs ipc call note center
+
+# --------------------- APPLICATIONS ---------------------
+
+super + Return
+	wezterm
+
+super + h
+	wezterm -e herdr
+
+super + shift + Return
+	emacsclient -c -e '(ghostel)'
+
+super + n
+	emacsclient -c -e '(dirvish)'
+
+super + shift + n
+      nautilus 
+
+super + e
+	emacsclient -c -a "emacs"
+
+super + b
+	librewolf
+
+super + space
+	qs ipc call launcher toggle
+
+super + shift + c
+      xcolor -f hex -s clipboard
+
+super + m
+	feishin
+
+super + d
+	discord 
+
+super + l
+	localsend_app
+
+super + g
+	signal-desktop
+
+super + c
+      cinny
+
+super + j
+      bolt-launcher 
+
+super + s
+      steam
+
+# ------------------- SCRATCHPADS -------------------
+
+super + shift + t
+      ~/nux/home/config/bspwm/scripts/scratchpad.sh terminal
+
+super + shift + s
+      ~/nux/home/config/bspwm/scripts/scratchpad.sh wiremix
+
+super + shift + b
+      ~/nux/home/config/bspwm/scripts/scratchpad.sh bluetui
+
+# --------------------- SYSTEM ---------------------
+
+super + shift + l
+      qs ipc call lock toggle
+
+super + alt + s
+	systemctl poweroff
+
+super + alt + r
+	reboot
+
+super + shift + x
+	xkill
+
+# --------------------- AUDIO / BRIGHTNESS ---------------------
+
+XF86AudioRaiseVolume
+	pamixer --increase 5
+
+XF86AudioLowerVolume
+	pamixer --decrease 5
+
+XF86AudioMute
+	pamixer --toggle-mute
+
+super + F3
+	pamixer --increase 5
+
+super + F2
+	pamixer --decrease 5
+
+super + F5
+	pamixer --toggle-mute
+
+XF86MonBrightnessUp
+	brightnessctl set +2%
+
+XF86MonBrightnessDown
+	brightnessctl set 2%-
+
+
+# --------------------- SCREENSHOT / MISC TOOLS ---------------------
+
+super + Home
+	qs ipc call screenshot toggle
+
+ctrl + alt + v
+	bspc rule -a \* -o state=floating ; pavucontrol
+
+
+# --------------------- DUNST (NOTIFICATIONS) ---------------------
+
+super + shift + Escape
+	qs ipc call notifications toggle
+
+super + shift + w
+	qs ipc call wallpaper toggle
+
+alt + shift + s
+	qs ipc call settings toggle
+
+
+# ====================================================================
+# BSPWM WINDOW MANAGEMENT
+# ====================================================================
+
+# --- close / kill ---
+super + q
+	bspc node -c
+
+# --- layout ---
+super + o
+	bspc desktop -l next
+
+super + alt + o
+	bsp-layout next --layouts tall,monocle,tiled
+
+super + alt + shift + o
+	bsp-layout previous --layouts tall,monocle,tiled
+
+super + f
+	bspc node -t floating
+
+super + t
+	bspc node -t tiled
+
+super + shift + f
+	bspc node -t fullscreen
+
+# --- node flags ---
+super + ctrl + {m,x,y,z}
+	bspc node -g {marked,locked,sticky,private}
+
+
+# --------------------- FOCUS / SWAP ---------------------
+# focus the node in the given direction
+super + {_,shift + }{Left,Down,Up,Right}
+	bspc node -{f,s} {west,south,north,east}
+
+super + {_,shift + }{h,j,k,l}
+	bspc node -{f,s} {west,south,north,east}
+
+# focus the node for the given path jump
+super + {p,b,comma,period}
+	bspc node -f @{parent,brother,first,second}
+
+# focus the next/previous node in the current desktop
+super + {_,shift + }c
+	bspc node -f {next,prev}.local
+
+# focus the next/previous desktop in the current monitor
+super + bracket{left,right}
+	bspc desktop -f {prev,next}.local
+
+ctrl + alt + {Left,Right}
+	bspc node -d {prev,next} -f
+
+ctrl + alt + {h,l}
+	bspc node -d {prev,next} -f
+
+# focus the last node/desktop
+super + {grave,Tab}
+	~/.config/bspwm/scripts/swap_windows.sh
+
+# focus the older or newer node in the focus history
+super + {ctrl + o,i}
+	bspc wm -h off; \
+	bspc node {older,newer} -f; \
+	bspc wm -h on
+
+# focus or send to the given desktop
+super + {_,shift + }{1-9,0}
+	bspc {desktop -f,node -d} '^{1-9,10}' --follow
+
+
+# --------------------- MOVE / RESIZE ---------------------
+# expand a window by moving one of its sides outward
+super + alt + {Left,Down,Up,Right}
+	bspc node -z {left -20 0,bottom 0 20,top 0 -20,right 20 0}
+
+# contract a window by moving one of its sides inward
+super + alt + shift + {Left,Down,Up,Right}
+	bspc node -z {right -20 0,top 0 20,bottom 0 -20,left 20 0}
+
+# move a floating window
+super + ctrl + {Left,Down,Up,Right}
+	bspc node -v {-20 0,0 20,0 -20,20 0}
+
+
+# --------------------- PRESELECT (disabled) ---------------------
+#super + ctrl + {Left,Down,Up,Right}
+#	bspc node -p {west,south,north,east}
+#super + ctrl + {h,j,k,l}
+#	bspc node -p {west,south,north,east}
+#super + ctrl + {1-9}
+#	bspc node -o 0.{1-9}
+#super + ctrl + space
+#	bspc node -p cancel
+#super + ctrl + shift + space
+#	bspc query -N -d | xargs -I id -n 1 bspc node id -p cancel
+
+
+# --------------------- GAPS (disabled) ---------------------
+#super + shift + g : {plus,minus}
+#	bspc config window_gap $(( $(bspc config window_gap) {+,-} 5 ))
