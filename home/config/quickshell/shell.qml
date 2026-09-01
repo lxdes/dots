@@ -137,6 +137,10 @@ ShellRoot {
     property var workspaceStates: WmState.workspaces
     property int batteryCapacity: -1
     property string batteryStatus: ""
+    property double batteryPowerWatts: 0.0
+    property int batteryHealth: -1
+    property int batteryCycleCount: -1
+    property string batteryTimeRemaining: ""
     property real brightnessLevel: 60
     property var copyqHistory: []
     property bool trayExpanded: false
@@ -402,7 +406,34 @@ ShellRoot {
         root.lastBatteryUpdate = Date.now()
         const fields = output.trim().split("\n")
         batteryCapacity = fields.length > 0 && !isNaN(Number(fields[0])) ? Number(fields[0]) : -1
-        batteryStatus = fields.length > 1 ? fields[1] : ""
+        batteryStatus = fields.length > 1 ? fields[1].trim() : ""
+        const pwrMicro = fields.length > 2 && !isNaN(Number(fields[2])) ? Number(fields[2]) : 0
+        batteryPowerWatts = pwrMicro > 0 ? (pwrMicro / 1000000) : 0
+        const enow = fields.length > 3 && !isNaN(Number(fields[3])) ? Number(fields[3]) : 0
+        const efull = fields.length > 4 && !isNaN(Number(fields[4])) ? Number(fields[4]) : 0
+        const edes = fields.length > 5 && !isNaN(Number(fields[5])) ? Number(fields[5]) : 0
+        batteryCycleCount = fields.length > 6 && !isNaN(Number(fields[6])) && Number(fields[6]) >= 0 ? Number(fields[6]) : -1
+
+        if (efull > 0 && edes > 0)
+            batteryHealth = Math.min(100, Math.round((efull / edes) * 100))
+        else
+            batteryHealth = -1
+
+        if (batteryStatus === "Full") {
+            batteryTimeRemaining = "Fully charged"
+        } else if (batteryStatus === "Discharging" && pwrMicro > 0 && enow > 0) {
+            const totalHours = enow / pwrMicro
+            const h = Math.floor(totalHours)
+            const m = Math.round((totalHours - h) * 60)
+            batteryTimeRemaining = h > 0 ? (h + "h " + m + "m remaining") : (m + "m remaining")
+        } else if (batteryStatus === "Charging" && pwrMicro > 0 && efull > enow) {
+            const totalHours = (efull - enow) / pwrMicro
+            const h = Math.floor(totalHours)
+            const m = Math.round((totalHours - h) * 60)
+            batteryTimeRemaining = h > 0 ? (h + "h " + m + "m until full") : (m + "m until full")
+        } else {
+            batteryTimeRemaining = batteryStatus
+        }
     }
 
     function updateActiveTitle(output) {
@@ -1151,6 +1182,8 @@ ShellRoot {
             calendarPopup.visible = false
         if (typeof layoutPopup !== "undefined")
             layoutPopup.visible = false
+        if (typeof batteryPopup !== "undefined")
+            batteryPopup.visible = false
         if (typeof quickNotePopup !== "undefined")
             quickNotePopup.visible = false
     }
@@ -1601,7 +1634,7 @@ ShellRoot {
 
     Process {
         id: batteryQuery
-        command: ["sh", "-c", "battery=; for dir in /sys/class/power_supply/BAT*; do if [ -d \"$dir\" ]; then battery=\"$dir\"; break; fi; done; if [ -n \"$battery\" ]; then cat \"$battery/capacity\"; cat \"$battery/status\"; else printf '%s\\n' -1 unavailable; fi"]
+        command: ["sh", "-c", "battery=; for dir in /sys/class/power_supply/BAT* /sys/class/power_supply/battery; do if [ -d \"$dir\" ]; then battery=\"$dir\"; break; fi; done; if [ -n \"$battery\" ]; then cap=$(cat \"$battery/capacity\" 2>/dev/null || echo -1); st=$(cat \"$battery/status\" 2>/dev/null || echo \"\"); pwr=$(cat \"$battery/power_now\" 2>/dev/null || cat \"$battery/current_now\" 2>/dev/null || echo 0); enow=$(cat \"$battery/energy_now\" 2>/dev/null || cat \"$battery/charge_now\" 2>/dev/null || echo 0); efull=$(cat \"$battery/energy_full\" 2>/dev/null || cat \"$battery/charge_full\" 2>/dev/null || echo 0); edes=$(cat \"$battery/energy_full_design\" 2>/dev/null || cat \"$battery/charge_full_design\" 2>/dev/null || echo 0); cyc=$(cat \"$battery/cycle_count\" 2>/dev/null || echo -1); printf '%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n%s\\n' \"$cap\" \"$st\" \"$pwr\" \"$enow\" \"$efull\" \"$edes\" \"$cyc\"; else printf '%s\\n%s\\n0\\n0\\n0\\n0\\n-1\\n' -1 unavailable; fi"]
         running: true
         stdout: StdioCollector {
             id: batteryOutput
@@ -1941,6 +1974,13 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "battery"
+        function toggle(): void {
+            root.togglePopup(batteryPopup)
+        }
+    }
+
+    IpcHandler {
         target: "bluetooth"
         function toggle(): void {
             root.togglePopup(bluetoothPopup)
@@ -2245,7 +2285,7 @@ ShellRoot {
                     implicitWidth: 26 * root.menuScale
                     implicitHeight: 24 * root.menuScale
                     radius: 6
-                    color: batteryMouse.containsMouse ? root.settingsRaised : "transparent"
+                    color: batteryMouse.containsMouse || batteryPopup.visible ? root.settingsRaised : "transparent"
 
                     Behavior on color { ColorAnimation { duration: 120 } }
 
@@ -2254,19 +2294,19 @@ ShellRoot {
                         text: root.batteryStatus === "Charging" ? "󰂄" : root.batteryCapacity <= 15 ? "󰁺" : root.batteryCapacity <= 35 ? "󰁼" : root.batteryCapacity <= 65 ? "󰁾" : "󰂀"
                         color: root.batteryStatus === "Charging" ? "#a6e3a1" : (root.batteryCapacity <= 15 ? "#f38ba8" : foreground)
                         font.family: "Symbols Nerd Font Mono"
-                        font.pixelSize: 16 * root.displayFontScale
+                        font.pixelSize: 13 * root.displayFontScale
                     }
 
                     activeFocusOnTab: true
                     Accessible.role: Accessible.Button
-                    Accessible.name: "Battery " + root.batteryCapacity + " percent. Open session settings"
-                    Keys.onReturnPressed: root.openSettings("Session")
+                    Accessible.name: "Battery " + root.batteryCapacity + " percent. Toggle battery stats"
+                    Keys.onReturnPressed: root.togglePopup(batteryPopup)
 
                     MouseArea {
                         id: batteryMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: root.openSettings("Session")
+                        onClicked: root.togglePopup(batteryPopup)
                     }
                 }
 
@@ -2703,6 +2743,12 @@ ShellRoot {
         id: volumePopup
         shellRoot: root
         barWindow: bar
+    }
+
+    BatteryPopup {
+        id: batteryPopup
+        root: root
+        bar: bar
     }
 
     PopupWindow {
