@@ -18,6 +18,7 @@ let
 
   homeConfigs = {
     ".xinitrc" = ".xinitrc";
+    ".Xresources" = ".Xresources";
   };
 in
 {

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+url=$(grep -Eo '(https?|ftp)://[^[:space:]<>"()]+' | sed 's/[.,;:!?]*$//' | tail -n 1)
+[ -n "$url" ] || exit 0
+
+nohup xdg-open "$url" >/dev/null 2>&1 &

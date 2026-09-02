@@ -18,6 +18,7 @@
 
   imports = [
     ./home/default.nix
+    ./modules/terminals/st.nix
   ];
 
 }

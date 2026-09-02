@@ -7,10 +7,10 @@
 alt + q
 	bspc quit
 
-alt + r
+super + shfit + r
 	~/.config/bspwm/scripts/reload.sh
 
-alt + p
+super + shift + p
 	qs ipc call power toggle
 
 alt + o
@@ -19,10 +19,10 @@ alt + o
 # --------------------- APPLICATIONS ---------------------
 
 super + Return
-	wezterm
+	st
 
 super + h
-	wezterm -e herdr
+	st -e herdr
 
 super + shift + Return
 	emacsclient -c -e '(ghostel)'
@@ -54,17 +54,14 @@ super + shift + w
 super + shift + c
       xcolor -f hex -s clipboard
 
-super + d
-	discord 
-
 super + l
 	localsend_app
 
 super + g
 	signal-desktop
 
-super + c
-      cinny
+super + d
+      sable
 
 super + j
       bolt-launcher 
@@ -91,7 +88,7 @@ super + shift + l
 super + alt + s
 	systemctl poweroff
 
-alt + k
+alt + q
 	xkill
 
 # --------------------- AUDIO / BRIGHTNESS ---------------------
