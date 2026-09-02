@@ -1,7 +1,6 @@
 # array's st build
 
-This build tracks `st 0.9.2` and matches the WezTerm setup in
-`~/.config/wezterm/wezterm.lua`: IosevkaTerm Nerd Font 12, Tokyo Night,
+This build tracks `st 0.9.2`: IosevkaTerm Nerd Font 12, Tokyo Night,
 an opaque `#111117` background, and a 120x28 initial window.
 
 The source lives in `~/nux/home/config/st` and is packaged for every Home

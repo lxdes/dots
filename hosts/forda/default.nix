@@ -30,7 +30,6 @@
     ../../modules/system/icons.nix
     ../../modules/system/quickshell.nix
     ../../modules/system/screenshot.nix
-    ../../modules/terminals/wezterm.nix
   ];
 
   nux.cursor.size = 24;

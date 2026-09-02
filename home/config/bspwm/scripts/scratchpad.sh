@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# scratchpad — toggle a class-tagged wezterm window.
+# scratchpad — toggle a class-tagged st window.
 # Usage: scratchpad <name>
 
 case "$1" in
@@ -32,9 +32,9 @@ id=$(xdotool search --class "$CLASS" | head -n1)
 if [ -z "$id" ]; then
 	bspc rule -a "$CLASS" -o state=floating rectangle="$GEOM" center=on sticky=on
 	if [ -n "$CMD" ]; then
-		wezterm start --class "$CLASS" -e $CMD &
+		st -c "$CLASS" -e $CMD &
 	else
-		wezterm start --class "$CLASS" &
+		st -c "$CLASS" &
 	fi
 else
 	bspc node "$id" -g hidden -f

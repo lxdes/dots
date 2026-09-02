@@ -475,7 +475,7 @@ Window {
                             Layout.fillWidth: true
                             DataText { text: "DEFAULT DEVICES"; color: window.accent; font.weight: Font.DemiBold }
                             Item { Layout.fillWidth: true }
-                            UiButton { text: "󰓃  Open Wiremix"; onClicked: root.run(["wezterm", "-e", "wiremix"]) }
+                            UiButton { text: "󰓃  Open Wiremix"; onClicked: root.run(["st", "-e", "wiremix"]) }
                         }
                         DataText { text: "OUTPUT" }
                         ColumnLayout {
@@ -591,7 +591,7 @@ Window {
                                 Layout.fillWidth: true
                                 DataText { text: "AVAILABLE NETWORKS"; color: window.accent; font.weight: Font.DemiBold }
                                 Item { Layout.fillWidth: true }
-                                UiButton { text: "Open nmtui"; onClicked: root.run(["wezterm", "-e", "nmtui"]) }
+                                UiButton { text: "Open nmtui"; onClicked: root.run(["st", "-e", "nmtui"]) }
                                 UiButton {
                                     text: root.networkScanning ? "Scanning..." : "󰑐  Scan"
                                     enabled: root.wifiAvailable && root.wifiEnabled && !root.networkScanning
@@ -785,7 +785,7 @@ Window {
                             Layout.fillWidth: true
                             DataText { text: "KNOWN DEVICES"; color: window.accent; font.weight: Font.DemiBold }
                             Item { Layout.fillWidth: true }
-                            UiButton { text: "Open bluetui"; onClicked: root.run(["wezterm", "-e", "bluetui"]) }
+                            UiButton { text: "Open bluetui"; onClicked: root.run(["st", "-e", "bluetui"]) }
                             UiButton { text: root.bluetoothScanning ? "Scanning..." : "󰑐  Scan"; enabled: root.bluetoothEnabled && !root.bluetoothScanning && !root.bluetoothActionBusy; onClicked: root.refreshBluetoothDevices() }
                         }
                         ColumnLayout {

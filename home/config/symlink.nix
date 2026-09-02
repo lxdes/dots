@@ -11,7 +11,6 @@ let
     sxhkd = "sxhkd";
     picom = "picom";
     touchegg = "touchegg";
-    wezterm = "wezterm";
     herdr = "herdr";
     quickshell = "quickshell";
   };

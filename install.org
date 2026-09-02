@@ -17,12 +17,6 @@ sudo dnf install git bspwm sxhkd picom polybar rofi zsh bat eza zoxide fastfetch
 chsh -s $(which zsh)
 #+END_SRC
 
-** WezTerm
-#+BEGIN_SRC bash
-sudo dnf copr enable wezfurlong/wezterm-nightly
-sudo dnf install wezterm
-#+END_SRC
-
 ** Nix
 #+BEGIN_SRC bash
 sudo dnf install nix nix-daemon

@@ -2283,7 +2283,7 @@ ShellRoot {
                         anchors.fill: parent
                         hoverEnabled: true
                         onClicked: root.togglePopup(networkPopup)
-                        onPressAndHold: root.run(["wezterm", "-e", "nmtui"])
+                        onPressAndHold: root.run(["st", "-e", "nmtui"])
                     }
                 }
 
@@ -2343,7 +2343,7 @@ ShellRoot {
                         anchors.fill: parent
                         hoverEnabled: true
                                 onClicked: root.togglePopup(bluetoothPopup), root.bluetoothPopupExplicitlyOpened = true
-                        onPressAndHold: root.run(["wezterm", "-e", "bluetui"])
+                        onPressAndHold: root.run(["st", "-e", "bluetui"])
                     }
                 }
 
@@ -2882,7 +2882,7 @@ ShellRoot {
                     Layout.fillWidth: true
                     implicitHeight: 32
                     text: "󰖩  Open Network Manager"
-                    onClicked: root.run(["wezterm", "-e", "nmtui"])
+                    onClicked: root.run(["st", "-e", "nmtui"])
                     contentItem: Text {
                         text: parent.text
                         color: foreground
@@ -3173,7 +3173,7 @@ ShellRoot {
                     Layout.fillWidth: true
                     implicitHeight: 32
                     text: "󰂱  Open Bluetooth Manager"
-                    onClicked: root.run(["wezterm", "-e", "bluetui"])
+                    onClicked: root.run(["st", "-e", "bluetui"])
                     contentItem: Text {
                         text: parent.text
                         color: foreground

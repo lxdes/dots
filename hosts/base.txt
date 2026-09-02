@@ -27,6 +27,5 @@ NetworkManager-tui
 NetworkManager-wifi
 wpa_supplicant
 tailscale
-wezterm
 xclip
 xcolor

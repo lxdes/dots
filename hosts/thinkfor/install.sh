@@ -21,7 +21,6 @@ copr_repos=(
 	lxdes/xcolor
 	lxdes/i3lock-color
 	lxdes/betterlockscreen
-	wezfurlong/wezterm-nightly
 )
 
 for manifest in "$repo_root/hosts/base.txt" "$host_dir/packages.txt"; do
