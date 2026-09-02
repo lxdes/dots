@@ -15,6 +15,7 @@ let
       pkgs.fontconfig
       pkgs.freetype
       pkgs.libx11
+      pkgs.libXcursor
       pkgs.libxft
       pkgs.libxrender
     ];
