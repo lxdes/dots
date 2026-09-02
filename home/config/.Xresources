@@ -1,3 +1,7 @@
+! Xcursor & Fonts
+Xcursor.theme: Bibata-Modern-Ice
+Xcursor.size: 24
+
 ! st defaults matching ~/.config/wezterm/wezterm.lua
 st.font: IosevkaTerm Nerd Font:size=12:antialias=true:hinting=true
 st.alpha: 1.0
