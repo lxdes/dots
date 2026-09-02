@@ -1267,7 +1267,7 @@ xinit(int cols, int rows)
 	}
 
 	/* load themed mouse cursor with fallback */
-	if ((cursor = XcursorLibraryLoadCursor(xw.dpy, "xterm")) != None) {
+	if ((cursor = XcursorLibraryLoadCursor(xw.dpy, "left_ptr")) != None) {
 		XDefineCursor(xw.dpy, xw.win, cursor);
 	} else {
 		cursor = XCreateFontCursor(xw.dpy, mouseshape);
